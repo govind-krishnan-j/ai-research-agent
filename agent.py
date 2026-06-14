@@ -66,8 +66,10 @@ def send_with_retry(chat, message, retries=3, wait=60):
     raise Exception("[Agent] Max retries exceeded. Please wait a few minutes and try again.")
 
 
-def run_agent(topic: str) -> str:
-    """Run the research agent on a given topic."""
+def run_agent(topic: str) -> tuple[str, list[str]]:
+    """Run the research agent on a given topic.
+    Returns a tuple of (report_text, sources_list)
+    """
 
     model = genai.GenerativeModel(
         model_name="gemini-2.5-flash-lite",
@@ -76,18 +78,22 @@ def run_agent(topic: str) -> str:
 
     chat = model.start_chat()
 
+    # Track sources as agent reads pages
+    sources = []
+
     prompt = f"""You are a research assistant agent. Your job is to research the topic: "{topic}"
 
-Follow these steps:
-1. Search the web for the topic using the web_search tool
-2. Pick the 2 most relevant URLs from the results
-3. Read each URL using the read_page tool
-4. Compile everything into a structured research report with:
+You MUST follow these steps in order:
+1. Call web_search tool to search for the topic
+2. From the results, pick the 3 most relevant URLs and call read_page on EACH of them one by one
+3. If a page returns empty or useless content, skip it and try the next URL
+4. After reading pages, compile a structured research report with:
    - Summary
    - Key findings (at least 3 points)
    - Conclusion
 
-Start researching now."""
+IMPORTANT: You MUST attempt to read at least 3 pages. Do not write the report until you have read multiple pages.
+Start now."""
 
     console.print(f"\n[bold blue][Agent][/bold blue] Starting research on: [bold yellow]{topic}[/bold yellow]")
 
@@ -101,52 +107,58 @@ Start researching now."""
         response = send_with_retry(chat, prompt)
 
     # --- Agentic loop ---
+
     while True:
-        try:
-            function_call = response.candidates[0].content.parts[0].function_call
-            if function_call.name:
-                tool_name = function_call.name
-                tool_args = dict(function_call.args)
+        parts = response.candidates[0].content.parts
 
-                if tool_name == "web_search":
-                    console.print(f"\n[bold green][Tool][/bold green] Searching for: [yellow]{tool_args.get('query')}[/yellow]")
-                elif tool_name == "read_page":
-                    console.print(f"[bold green][Tool][/bold green] Reading: [dim]{tool_args.get('url')}[/dim]")
+        # Find if any part is a function call
+        function_call_part = None
+        for part in parts:
+            if hasattr(part, "function_call") and part.function_call.name:
+                function_call_part = part
+                break
 
-                with Progress(
-                    SpinnerColumn(),
-                    TextColumn("[progress.description]{task.description}"),
-                    console=console,
-                    transient=True
-                ) as progress:
-                    progress.add_task(f"[dim]Running {tool_name}...[/dim]", total=None)
-                    tool_result = available_tools[tool_name](**tool_args)
+        if function_call_part:
+            tool_name = function_call_part.function_call.name
+            tool_args = dict(function_call_part.function_call.args)
 
-                if tool_name == "web_search":
-                    console.print(f"[bold green][Tool][/bold green] Found [bold]{len(tool_result)}[/bold] URLs ✓")
+            if tool_name == "web_search":
+                console.print(f"\n[bold green][Tool][/bold green] Searching for: [yellow]{tool_args.get('query')}[/yellow]")
+            elif tool_name == "read_page":
+                url = tool_args.get('url')
+                console.print(f"[bold green][Tool][/bold green] Reading: [dim]{url}[/dim]")
+                if url and url not in sources:
+                    sources.append(url)
 
-                response = send_with_retry(
-                    chat,
-                    {
-                        "role": "tool",
-                        "parts": [{
-                            "function_response": {
-                                "name": tool_name,
-                                "response": {"result": str(tool_result)}
-                            }
-                        }]
-                    }
-                )
-            else:
-                console.print("\n[bold blue][Agent][/bold blue] [green]✓ Research complete! Compiling report...[/green]")
-                return response.text
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+                transient=True
+            ) as progress:
+                progress.add_task(f"[dim]Running {tool_name}...[/dim]", total=None)
+                tool_result = available_tools[tool_name](**tool_args)
 
-        except (AttributeError, IndexError):
+            if tool_name == "web_search":
+                console.print(f"[bold green][Tool][/bold green] Found [bold]{len(tool_result)}[/bold] URLs ✓")
+
+            response = send_with_retry(
+                chat,
+                {
+                    "role": "tool",
+                    "parts": [{
+                        "function_response": {
+                            "name": tool_name,
+                            "response": {"result": str(tool_result)}
+                        }
+                    }]
+                }
+            )
+
+        else:
+            # No function call — extract text from parts
             console.print("\n[bold blue][Agent][/bold blue] [green]✓ Research complete! Compiling report...[/green]")
-            try:
-                return response.text
-            except ValueError:
-                for part in response.candidates[0].content.parts:
-                    if hasattr(part, "text") and part.text:
-                        return part.text
-                return "Agent could not complete the report. Please try again."
+            for part in parts:
+                if hasattr(part, "text") and part.text:
+                    return part.text, sources
+            return "Agent could not complete the report. Please try again.", sources

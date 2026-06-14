@@ -1,7 +1,6 @@
 import os
 from datetime import datetime
 
-
 def save_report(topic: str, content: str) -> str:
     """Save the final research report to a text file."""
 
