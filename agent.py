@@ -1,5 +1,7 @@
 import google.generativeai as genai
 from dotenv import load_dotenv
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn
 import os
 import time
 from tools import web_search, read_page
@@ -7,7 +9,8 @@ from tools import web_search, read_page
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-# --- Define tools for Gemini (function calling) ---
+console = Console()
+
 tools_definition = [
     {
         "function_declarations": [
@@ -43,7 +46,6 @@ tools_definition = [
     }
 ]
 
-# --- Map tool names to actual Python functions ---
 available_tools = {
     "web_search": web_search,
     "read_page": read_page
@@ -57,7 +59,7 @@ def send_with_retry(chat, message, retries=3, wait=60):
             return chat.send_message(message)
         except Exception as e:
             if "RESOURCE_EXHAUSTED" in str(e):
-                print(f"\n[Agent] Rate limit hit. Waiting {wait}s before retry {i+1}/{retries}...")
+                console.print(f"[yellow]⚠ Rate limit hit. Waiting {wait}s before retry {i+1}/{retries}...[/yellow]")
                 time.sleep(wait)
             else:
                 raise e
@@ -87,10 +89,16 @@ Follow these steps:
 
 Start researching now."""
 
-    print(f"\n[Agent] Starting research on: {topic}")
-    print("[Agent] Thinking...\n")
+    console.print(f"\n[bold blue][Agent][/bold blue] Starting research on: [bold yellow]{topic}[/bold yellow]")
 
-    response = send_with_retry(chat, prompt)
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+        transient=True
+    ) as progress:
+        progress.add_task("[dim]Thinking...[/dim]", total=None)
+        response = send_with_retry(chat, prompt)
 
     # --- Agentic loop ---
     while True:
@@ -100,9 +108,22 @@ Start researching now."""
                 tool_name = function_call.name
                 tool_args = dict(function_call.args)
 
-                print(f"[Agent] Calling tool: {tool_name} with args: {tool_args}")
+                if tool_name == "web_search":
+                    console.print(f"\n[bold green][Tool][/bold green] Searching for: [yellow]{tool_args.get('query')}[/yellow]")
+                elif tool_name == "read_page":
+                    console.print(f"[bold green][Tool][/bold green] Reading: [dim]{tool_args.get('url')}[/dim]")
 
-                tool_result = available_tools[tool_name](**tool_args)
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    console=console,
+                    transient=True
+                ) as progress:
+                    progress.add_task(f"[dim]Running {tool_name}...[/dim]", total=None)
+                    tool_result = available_tools[tool_name](**tool_args)
+
+                if tool_name == "web_search":
+                    console.print(f"[bold green][Tool][/bold green] Found [bold]{len(tool_result)}[/bold] URLs ✓")
 
                 response = send_with_retry(
                     chat,
@@ -117,16 +138,14 @@ Start researching now."""
                     }
                 )
             else:
-                print("\n[Agent] Research complete. Compiling report...")
+                console.print("\n[bold blue][Agent][/bold blue] [green]✓ Research complete! Compiling report...[/green]")
                 return response.text
 
         except (AttributeError, IndexError):
-            # No function call found — Gemini is done
-            print("\n[Agent] Research complete. Compiling report...")
+            console.print("\n[bold blue][Agent][/bold blue] [green]✓ Research complete! Compiling report...[/green]")
             try:
                 return response.text
             except ValueError:
-                # Response was cut short — extract text manually
                 for part in response.candidates[0].content.parts:
                     if hasattr(part, "text") and part.text:
                         return part.text

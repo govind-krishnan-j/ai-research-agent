@@ -1,31 +1,33 @@
 from agent import run_agent
 from report import save_report
+from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Prompt
 
+console = Console()
 
 def main():
-    print("=" * 60)
-    print("       AI RESEARCH ASSISTANT AGENT")
-    print("=" * 60)
+    console.print(Panel.fit(
+        "[bold blue]AI Research Assistant Agent[/bold blue]\n[dim]Powered by Gemini + DuckDuckGo[/dim]",
+        border_style="blue"
+    ))
 
-    # Get topic from user
-    topic = input("\nEnter a research topic: ").strip()
+    topic = Prompt.ask("\n[bold yellow]Enter a research topic[/bold yellow]")
 
-    if not topic:
-        print("No topic entered. Exiting.")
+    if not topic.strip():
+        console.print("[red]No topic entered. Exiting.[/red]")
         return
 
-    # Run the agent
     report_content = run_agent(topic)
-
-    # Save the report
     filepath = save_report(topic, report_content)
 
-    # Print the report to terminal as well
-    print("\n" + "=" * 60)
-    print("FINAL REPORT")
-    print("=" * 60)
-    print(report_content)
-    print(f"\n✅ Report saved to: {filepath}")
+    console.print(Panel(
+        report_content,
+        title="[bold green]Final Report[/bold green]",
+        border_style="green"
+    ))
+
+    console.print(f"\n[bold green]✓ Report saved to:[/bold green] [dim]{filepath}[/dim]")
 
 
 if __name__ == "__main__":
