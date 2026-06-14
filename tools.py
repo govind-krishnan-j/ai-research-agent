@@ -27,7 +27,11 @@ def read_page(url: str) -> str:
             tag.decompose()
 
         text = soup.get_text(separator=" ", strip=True)
+
+        if len(text) < 100:
+            return "Page content could not be extracted (possibly JavaScript-rendered)."
+
         return text[:3000]
 
     except Exception as e:
-        return ""
+        return f"Could not read page: {str(e)}"
