@@ -9,7 +9,7 @@ console = Console()
 
 def main():
     console.print(Panel.fit(
-        "[bold blue]AI Research Assistant Agent[/bold blue]\n[dim]Powered by Gemini + DuckDuckGo[/dim]",
+        "[bold blue]AI Research Assistant Agent[/bold blue]\n[dim]Powered by Groq (Llama) + DuckDuckGo[/dim]",
         border_style="blue"
     ))
 
