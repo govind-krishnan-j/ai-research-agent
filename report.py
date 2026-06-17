@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 from rich.console import Console
+import re
 console = Console()
 
 def save_report(topic: str, content: str) -> str:
@@ -11,6 +12,7 @@ def save_report(topic: str, content: str) -> str:
 
     # Create a clean filename from the topic
     filename = topic.strip().lower().replace(" ", "_")
+    filename = re.sub(r'[<>:"/\\|?*]', '', filename)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filepath = f"reports/{filename}_{timestamp}.txt"
 
