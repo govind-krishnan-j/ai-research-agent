@@ -59,11 +59,11 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
     messages = [
         {
             "role": "system",
-            "content": "You are a research assistant agent. When given a topic, you MUST: 1) call web_search to find URLs, 2) call read_page on AT LEAST 2 URLs, 3) write a structured report with Summary, Key Findings, and Conclusion."
+            "content": "You are a research assistant agent. When given a topic, you MUST: 1) call web_search to find URLs, 2) call read_page on AT LEAST 2 URLs, 3) write a detailed and comprehensive structured report with Summary, Key Findings (minimum 6 points, each explained in 3-4 sentences), and Conclusion. The report must be at least 600 words."
         },
         {
             "role": "user",
-            "content": f'Research this topic thoroughly: "{topic}". Search the web, read at least 2 pages, then write a complete research report.'
+            "content": f'Research this topic thoroughly: "{topic}". Search the web, read at least 2 pages, then write a detailed research report of at least 600 words. Each key finding must be explained in depth with supporting details.'
         }
     ]
 
@@ -83,7 +83,7 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
                 messages=messages,
                 tools=tools_definition,
                 tool_choice="auto",
-                max_tokens=4096
+                max_tokens=8192
             )
 
         message = response.choices[0].message
