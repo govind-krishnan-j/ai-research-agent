@@ -5,3 +5,4 @@ ddgs
 python-dotenv
 rich
 streamlit
+fpdf2

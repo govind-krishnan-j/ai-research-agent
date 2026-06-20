@@ -5,10 +5,12 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 import os
 import json
 from tools import web_search, read_page
+import streamlit as st
+
 
 load_dotenv()
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-console = Console()
+api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
+client = Groq(api_key=api_key)
 
 tools_definition = [
     {
