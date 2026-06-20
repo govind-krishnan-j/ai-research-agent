@@ -2,6 +2,8 @@ import os
 from datetime import datetime
 from rich.console import Console
 import re
+from fpdf import FPDF
+
 console = Console()
 
 def save_report(topic: str, content: str) -> str:
@@ -24,3 +26,18 @@ def save_report(topic: str, content: str) -> str:
 
     console.print(f"\n[bold green][Report][/bold green] Saved to: [dim]{filepath}[/dim]")
     return filepath
+
+def generate_pdf_bytes(topic: str, content: str) -> bytes:
+    """Generate a PDF report and return it as bytes (for Streamlit download)."""
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.multi_cell(0, 10, topic.upper())
+    pdf.ln(2)
+    pdf.set_font("Helvetica", "", 11)
+
+    # Clean text for PDF (remove markdown symbols that don't render well)
+    clean_content = content.replace("**", "").replace("###", "").replace("##", "")
+
+    pdf.multi_cell(0, 7, clean_content)
+    return bytes(pdf.output())

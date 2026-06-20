@@ -2,6 +2,7 @@ import streamlit as st
 import time
 from agent import run_agent
 from report import save_report
+from report import generate_pdf_bytes
 
 st.set_page_config(
     page_title="AI Research Assistant",
@@ -204,14 +205,24 @@ if run_btn:
 
         filepath = save_report(topic, full_report)
 
-        col1, col2 = st.columns(2)
+        pdf_bytes = generate_pdf_bytes(topic, full_report)
+
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.download_button(
-                label="⬇️ Download Report (.txt)",
+                label="⬇️ Download .txt",
                 data=full_report,
                 file_name=f"{topic.replace(' ', '_')}_report.txt",
                 mime="text/plain",
                 use_container_width=True
             )
         with col2:
-            st.success(f"✅ Saved to: {filepath}")
+            st.download_button(
+                label="⬇️ Download PDF",
+                data=pdf_bytes,
+                file_name=f"{topic.replace(' ', '_')}_report.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+        with col3:
+            st.success(f"✅ Saved")

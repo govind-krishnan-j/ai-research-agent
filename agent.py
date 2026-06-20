@@ -57,15 +57,15 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
 
     sources = []
     messages = [
-        {
-            "role": "system",
-            "content": "You are a research assistant agent. When given a topic, you MUST: 1) call web_search to find URLs, 2) call read_page on AT LEAST 2 URLs, 3) write a detailed and comprehensive structured report with Summary, Key Findings (minimum 6 points, each explained in 3-4 sentences), and Conclusion. The report must be at least 600 words."
-        },
-        {
-            "role": "user",
-            "content": f'Research this topic thoroughly: "{topic}". Search the web, read at least 2 pages, then write a detailed research report of at least 600 words. Each key finding must be explained in depth with supporting details.'
-        }
-    ]
+    {
+        "role": "system",
+        "content": "You are a research assistant agent. You have access to two tools: web_search and read_page. To research any topic, you MUST actually call these tools using proper function calling — never describe what you would do, always DO it by calling the tool. Steps: 1) Call web_search with the topic as the query. 2) Call read_page on at least 2 of the returned URLs. 3) After reading the pages, write a structured report with Summary, Key Findings (6+ points), and Conclusion, at least 600 words."
+    },
+    {
+        "role": "user",
+        "content": f'Research this topic and write a full report: "{topic}"'
+    }
+]
 
     console.print(f"\n[bold blue][Agent][/bold blue] Starting research on: [bold yellow]{topic}[/bold yellow]")
 
@@ -78,13 +78,17 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
             transient=True
         ) as progress:
             progress.add_task("[dim]Thinking...[/dim]", total=None)
-            response = client.chat.completions.create(
-                model="meta-llama/llama-4-scout-17b-16e-instruct",
-                messages=messages,
-                tools=tools_definition,
-                tool_choice="auto",
-                max_tokens=8192
-            )
+            try:
+                response = client.chat.completions.create(
+                    model="meta-llama/llama-4-scout-17b-16e-instruct",
+                    messages=messages,
+                    tools=tools_definition,
+                    tool_choice="auto",
+                    max_tokens=4096
+                )
+            except Exception as e:
+                console.print(f"[red]⚠ API error: {str(e)[:200]}[/red]")
+                return "Sorry, the agent encountered an issue processing this topic. Please try rephrasing it or try again.", sources
 
         message = response.choices[0].message
 
