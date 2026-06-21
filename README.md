@@ -4,7 +4,7 @@ An autonomous AI agent that researches any topic by searching the web, reading s
 
 Built from scratch using **agentic function calling**, powered by **Groq (Llama 4)** for fast inference and **DuckDuckGo** for live web search.
 
-🔗 **Live Demo:** [ai-research-agent.streamlit.app] (https://ai-research-agent-6ua9dxxbwldju4mm8hhobg.streamlit.app/) 
+🔗 **Live Demo:** [ai-research-agent.streamlit.app](https://ai-research-agent-6ua9dxxbwldju4mm8hhobg.streamlit.app/) 
 📦 **Repository:** [github.com/govind-krishnan-j/ai-research-agent](https://github.com/govind-krishnan-j/ai-research-agent)
 
 ---
