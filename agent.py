@@ -62,7 +62,7 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
     messages = [
     {
         "role": "system",
-        "content": "You are a research assistant agent. You have access to two tools: web_search and read_page. To research any topic, you MUST actually call these tools using proper function calling — never describe what you would do, always DO it by calling the tool. Steps: 1) Call web_search with the topic as the query. 2) Call read_page on at least 2 of the returned URLs. 3) After reading the pages, write a structured report with Summary, Key Findings (6+ points), and Conclusion, at least 600 words."
+        "content": "You are a research assistant agent. You have access to two tools: web_search and read_page. To research any topic, you MUST actually call these tools using proper function calling — never describe what you would do, always DO it by calling the tool. Steps: 1) Call web_search with the topic as the query. 2) Call read_page on at least 2 of the returned URLs. 3) After reading the pages, write a structured report with Summary, Key Findings (6+ points), and Conclusion, at least 600 words(important)."
     },
     {
         "role": "user",
