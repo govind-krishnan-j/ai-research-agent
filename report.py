@@ -34,7 +34,7 @@ def generate_pdf_bytes(topic: str, content: str) -> bytes:
     pdf.set_font("Helvetica", "B", 16)
 
     safe_topic = topic.encode('latin-1', errors='replace').decode('latin-1')
-    pdf.multi_cell(0, 10, topic.upper())
+    pdf.multi_cell(0, 10, safe_topic.upper())
     pdf.ln(2)
     pdf.set_font("Helvetica", "", 11)
 
@@ -47,5 +47,5 @@ def generate_pdf_bytes(topic: str, content: str) -> bytes:
 
     safe_content = clean_content.encode('latin-1', errors='replace').decode('latin-1')
 
-    pdf.multi_cell(0, 7, clean_content)
+    pdf.multi_cell(0, 7, safe_content)
     return bytes(pdf.output())
