@@ -86,7 +86,7 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
             progress.add_task("[dim]Thinking...[/dim]", total=None)
             try:
                 response = client.chat.completions.create(
-                    model="meta-llama/llama-4-scout-17b-16e-instruct",
+                    model="openai/gpt-oss-120b",
                     messages=messages,
                     tools=tools_definition,
                     tool_choice="auto",
