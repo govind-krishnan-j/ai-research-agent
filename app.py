@@ -206,7 +206,7 @@ if run_btn:
 
         filepath = save_report(topic, full_report)
 
-        pdf_bytes = generate_pdf_bytes(topic, full_report)
+        pdf_bytes = generate_pdf_bytes(topic, report_content, sources)
 
         col1, col2, col3 = st.columns(3)
         with col1:
