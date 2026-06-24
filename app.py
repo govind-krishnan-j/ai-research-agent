@@ -100,15 +100,16 @@ st.markdown('<p class="main-header">🔬 AI Research Assistant</p>', unsafe_allo
 st.markdown('<p class="sub-caption">Enter any topic and the agent will autonomously research and compile a report.</p>', unsafe_allow_html=True)
 
 # --- Input ---
-col1, col2 = st.columns([5, 1])
-with col1:
-    topic = st.text_input(
-        "",
-        placeholder="e.g. artificial intelligence in healthcare",
-        label_visibility="collapsed"
-    )
-with col2:
-    run_btn = st.button("🔍 Research", type="primary", use_container_width=True)
+with st.form(key="research_form"):
+    col1, col2 = st.columns([5, 1])
+    with col1:
+        topic = st.text_input(
+            "",
+            placeholder="e.g. artificial intelligence in healthcare",
+            label_visibility="collapsed"
+        )
+    with col2:
+        run_btn = st.form_submit_button("🔍 Research", type="primary", use_container_width=True)
 
 st.divider()
 
