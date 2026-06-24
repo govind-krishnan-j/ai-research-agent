@@ -32,12 +32,20 @@ def generate_pdf_bytes(topic: str, content: str) -> bytes:
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
+
+    safe_topic = topic.encode('latin-1', errors='replace').decode('latin-1')
     pdf.multi_cell(0, 10, topic.upper())
     pdf.ln(2)
     pdf.set_font("Helvetica", "", 11)
 
     # Clean text for PDF (remove markdown symbols that don't render well)
-    clean_content = content.replace("**", "").replace("###", "").replace("##", "")
+    clean_content = content.replace("**", "").replace("###", "").replace("##", "").replace("#", "")
+    clean_content = clean_content.replace("\u2019", "'").replace("\u2018", "'")
+    clean_content = clean_content.replace("\u201c", '"').replace("\u201d", '"')
+    clean_content = clean_content.replace("\u2022", "-").replace("\u2013", "-").replace("\u2014", "-")
+    clean_content = clean_content.replace("\u2192", "->").replace("\u2190", "<-")
+
+    safe_content = clean_content.encode('latin-1', errors='replace').decode('latin-1')
 
     pdf.multi_cell(0, 7, clean_content)
     return bytes(pdf.output())
