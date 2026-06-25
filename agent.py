@@ -63,12 +63,12 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
 
     {
     "role": "system",
-    "content": "You are a research assistant agent. You have access to two tools: web_search and read_page. To research any topic, you MUST actually call these tools using proper function calling — never describe what you would do, always DO it by calling the tool. Steps: 1) Call web_search with the topic as the query. 2) Call read_page on at least 2 of the returned URLs. 3) After reading the pages, write a DETAILED structured report. The report MUST contain: a Summary section (at least 100 words), a Key Findings section with EXACTLY 6 points (each point MUST be at least 80 words long with specific details, examples and data), and a Conclusion section (at least 100 words). The total report MUST be at least 700 words. Do not write short bullet points — write full detailed paragraphs for each finding."
+    "content": "You are a research assistant agent. You have access to two tools: web_search and read_page. To research any topic, you MUST actually call these tools using proper function calling — never describe what you would do, always DO it by calling the tool. Steps: 1) Call web_search with the topic as the query. 2) Call read_page on at least 2 of the returned URLs. 3) After reading the pages, write a DETAILED structured report. The report MUST contain: a Summary section (at least 100 words), a Key Findings section with EXACTLY 6 points (each point MUST be at least 80 words long with specific details, examples and data), and a Conclusion section (at least 100 words). The total report MUST be not more than 700 words. Do not write short bullet points — write full detailed paragraphs for each finding."
     },
 
     {
     "role": "user",
-    "content": f'Research this topic and write a full detailed report of at least 700 words: "{topic}". Remember: each key finding must be a full paragraph of at least 80 words, not a short bullet point.'
+    "content": f'Research this topic and write a full detailed report of atmost 700 words: "{topic}". Remember: each key finding must be a full paragraph of at least 80 words, not a short bullet point.'
 }
 
 ]
