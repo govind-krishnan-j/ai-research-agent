@@ -104,10 +104,10 @@ with st.form(key="research_form"):
     col1, col2 = st.columns([5, 1])
     with col1:
         topic = st.text_input(
-            "",
-            placeholder="e.g. artificial intelligence in healthcare",
-            label_visibility="collapsed"
-        )
+    "Research Topic",
+    placeholder="e.g. artificial intelligence in healthcare",
+    label_visibility="collapsed"
+)
     with col2:
         run_btn = st.form_submit_button("🔍 Research", type="primary", use_container_width=True)
 
