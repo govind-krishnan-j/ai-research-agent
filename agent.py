@@ -86,7 +86,7 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
             progress.add_task("[dim]Thinking...[/dim]", total=None)
             try:
                 response = client.chat.completions.create(
-                    model="qwen/qwen3.6-27b",
+                    model="llama-3.3-70b-versatile",
                     messages=messages,
                     tools=tools_definition,
                     tool_choice="auto",
