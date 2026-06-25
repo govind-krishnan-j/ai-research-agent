@@ -86,11 +86,11 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
             progress.add_task("[dim]Thinking...[/dim]", total=None)
             try:
                 response = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model="qwen/qwen3.6-27b",
                     messages=messages,
                     tools=tools_definition,
                     tool_choice="auto",
-                    max_tokens=8192
+                    max_tokens=4096
                 )
             except Exception as e:
                 console.print(f"[red]⚠ API error: {str(e)[:200]}[/red]")
