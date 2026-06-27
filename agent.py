@@ -90,7 +90,7 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
                     messages=messages,
                     tools=tools_definition,
                     tool_choice="auto",
-                    max_tokens=8192,
+                    max_tokens=4096,
                     reasoning_format="hidden"
                 )
             except Exception as e:
