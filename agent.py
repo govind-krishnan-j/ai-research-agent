@@ -90,7 +90,8 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
                     messages=messages,
                     tools=tools_definition,
                     tool_choice="auto",
-                    max_tokens=4096
+                    max_tokens=8192,
+                    reasoning_format="hidden"
                 )
             except Exception as e:
                 console.print(f"[red]⚠ API error: {str(e)[:200]}[/red]")
