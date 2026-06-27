@@ -139,4 +139,17 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
         else:
             # No tool calls — final report ready
             console.print("\n[bold blue][Agent][/bold blue] [green]✓ Research complete! Compiling report...[/green]")
-            return message.content, sources
+            
+            # Handle qwen thinking models that return empty content
+            content = message.content
+            if not content or content.strip() == "":
+                # Try extracting from choices directly
+                for choice in response.choices:
+                    if choice.message.content and choice.message.content.strip():
+                        content = choice.message.content
+                        break
+            
+            if not content or content.strip() == "":
+                return "The agent completed research but could not generate a report. Please try again.", sources
+                
+            return content, sources
