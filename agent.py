@@ -86,14 +86,19 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
             try:
                 # Force report generation if limits are hit
                 force_finish = search_count >= 1 and read_count >= 2
-                response = client.chat.completions.create(
-                    model="openai/gpt-oss-120b",
-                    messages=messages if not force_finish else messages + [{"role": "user", "content": "You have gathered enough information. Now write the complete research report immediately."}],
-                    tools=tools_definition if not force_finish else None,
-                    tool_choice="auto" if not force_finish else None,
-                    max_tokens=4096,
-                )
                 
+                api_params = {
+                    "model": "openai/gpt-oss-120b",
+                    "messages": messages if not force_finish else messages + [{"role": "user", "content": "You have gathered enough information. Now write the complete research report immediately."}],
+                    "max_tokens": 4096,
+                }
+                
+                if not force_finish:
+                    api_params["tools"] = tools_definition
+                    api_params["tool_choice"] = "auto"
+                
+                response = client.chat.completions.create(**api_params)
+
             except Exception as e:
                 console.print(f"[red]⚠ API error: {str(e)[:200]}[/red]")
                 return "Sorry, the agent encountered an issue processing this topic. Please try rephrasing it or try again.", sources
