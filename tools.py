@@ -31,7 +31,7 @@ def read_page(url: str) -> str:
         if len(text) < 100:
             return "Page content could not be extracted (possibly JavaScript-rendered)."
 
-        return text[:800]
+        return text[:1500]
 
     except Exception as e:
         return f"Could not read page: {str(e)}"
