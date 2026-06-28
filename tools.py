@@ -16,7 +16,7 @@ def web_search(query: str, num_results: int = 3) -> list[str]:
         return []
 
 
-def read_page(url: str) -> str:
+def read_page(url: str, **kwargs) -> str:
     """Fetch a webpage and return clean readable text."""
     try:
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"}
