@@ -84,11 +84,13 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
         ) as progress:
             progress.add_task("[dim]Thinking...[/dim]", total=None)
             try:
+                # Force report generation if limits are hit
+                force_finish = search_count >= 1 and read_count >= 2
                 response = client.chat.completions.create(
                     model="openai/gpt-oss-120b",
                     messages=messages,
                     tools=tools_definition,
-                    tool_choice="auto",
+                    tool_choice="none" if force_finish else "auto",
                     max_tokens=4096,
                 )
             except Exception as e:
@@ -112,11 +114,10 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
                 if tool_name == "web_search":
                     search_count += 1
                     if search_count > 1:
-                        console.print(f"[yellow][Agent] Search limit reached — skipping extra search.[/yellow]")
                         messages.append({
                             "role": "tool",
                             "tool_call_id": tool_call.id,
-                            "content": "Search limit reached. Please write the report now using information already gathered."
+                            "content": "Search limit reached."
                         })
                         continue
                     console.print(f"\n[bold green][Tool][/bold green] Searching for: [yellow]{tool_args.get('query')}[/yellow]")
@@ -124,11 +125,10 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
                 elif tool_name == "read_page":
                     read_count += 1
                     if read_count > 3:
-                        console.print(f"[yellow][Agent] Read limit reached — skipping extra page.[/yellow]")
                         messages.append({
                             "role": "tool",
                             "tool_call_id": tool_call.id,
-                            "content": "Page read limit reached. Please write the report now using information already gathered."
+                            "content": "Page read limit reached."
                         })
                         continue
                     url = tool_args.get('url')
