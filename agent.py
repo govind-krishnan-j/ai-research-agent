@@ -7,11 +7,10 @@ import json
 from tools import web_search, read_page
 import streamlit as st
 
-
 load_dotenv()
 api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
 client = Groq(api_key=api_key)
-console=Console()
+console = Console()
 
 tools_definition = [
     {
@@ -55,21 +54,22 @@ available_tools = {
     "read_page": read_page
 }
 
+
 def run_agent(topic: str) -> tuple[str, list[str]]:
     """Run the research agent on a given topic."""
 
     sources = []
+    search_count = 0
+    read_count = 0
     messages = [
-
-    {
-    "role": "system",
-    "content": "You are a research assistant agent. You have access to exactly two tools: 'web_search' and 'read_page'. Follow these steps STRICTLY in order: 1) Call web_search ONCE with the topic as query. 2) Call read_page on EXACTLY 2 URLs from the results. 3) Write the final report immediately after reading 2 pages. Do NOT call web_search more than once. Do NOT read more than 3 pages. After reading pages, you MUST write the report — do not search again."
-    },
-
-    {
-    "role": "user",
-    "content": f'Research this topic and write a full detailed report of atmost 700 words: "{topic}". Remember: each key finding must be a full paragraph of at least 80 words, not a short bullet point.'
-}
+        {
+            "role": "system",
+            "content": "You are a research assistant agent. You have access to exactly two tools: 'web_search' and 'read_page'. Follow these steps STRICTLY in order: 1) Call web_search ONCE with the topic as query. 2) Call read_page on EXACTLY 2 URLs from the results. 3) Write the final report immediately after reading 2 pages. Do NOT call web_search more than once. Do NOT read more than 3 pages. After reading pages, you MUST write the report — do not search again."
+        },
+        {
+            "role": "user",
+            "content": f'Research this topic and write a full detailed report of at most 700 words: "{topic}". Remember: each key finding must be a full paragraph of at least 80 words, not a short bullet point.'
+        }
     ]
 
     console.print(f"\n[bold blue][Agent][/bold blue] Starting research on: [bold yellow]{topic}[/bold yellow]")
@@ -110,8 +110,27 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
                 tool_args = json.loads(tool_call.function.arguments)
 
                 if tool_name == "web_search":
+                    search_count += 1
+                    if search_count > 1:
+                        console.print(f"[yellow][Agent] Search limit reached — skipping extra search.[/yellow]")
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": "Search limit reached. Please write the report now using information already gathered."
+                        })
+                        continue
                     console.print(f"\n[bold green][Tool][/bold green] Searching for: [yellow]{tool_args.get('query')}[/yellow]")
+
                 elif tool_name == "read_page":
+                    read_count += 1
+                    if read_count > 3:
+                        console.print(f"[yellow][Agent] Read limit reached — skipping extra page.[/yellow]")
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": "Page read limit reached. Please write the report now using information already gathered."
+                        })
+                        continue
                     url = tool_args.get('url')
                     console.print(f"[bold green][Tool][/bold green] Reading: [dim]{url}[/dim]")
                     if url and url not in sources:
@@ -138,17 +157,15 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
         else:
             # No tool calls — final report ready
             console.print("\n[bold blue][Agent][/bold blue] [green]✓ Research complete! Compiling report...[/green]")
-            
-            # Handle qwen thinking models that return empty content
+
             content = message.content
             if not content or content.strip() == "":
-                # Try extracting from choices directly
                 for choice in response.choices:
                     if choice.message.content and choice.message.content.strip():
                         content = choice.message.content
                         break
-            
+
             if not content or content.strip() == "":
                 return "The agent completed research but could not generate a report. Please try again.", sources
-                
+
             return content, sources
