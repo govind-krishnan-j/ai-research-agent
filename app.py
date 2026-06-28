@@ -208,16 +208,8 @@ if run_btn:
 
         pdf_bytes = generate_pdf_bytes(topic, report_content, sources)
 
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         with col1:
-            st.download_button(
-                label="⬇️ Download .txt",
-                data=full_report,
-                file_name=f"{topic.replace(' ', '_')}_report.txt",
-                mime="text/plain",
-                use_container_width=True
-            )
-        with col2:
             st.download_button(
                 label="⬇️ Download PDF",
                 data=pdf_bytes,
@@ -225,5 +217,5 @@ if run_btn:
                 mime="application/pdf",
                 use_container_width=True
             )
-        with col3:
-            st.success(f"✅ Saved")
+        with col2:
+            st.success(f"✅ Report ready!")
