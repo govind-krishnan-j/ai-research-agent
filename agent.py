@@ -106,7 +106,7 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
         message = response.choices[0].message
 
         # Check if model wants to call a tool
-        if message.tool_calls:
+        if message.tool_calls and not force_finish:
             messages.append({
                 "role": "assistant",
                 "content": message.content,
