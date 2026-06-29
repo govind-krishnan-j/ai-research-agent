@@ -90,7 +90,7 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
                 api_params = {
                     "model": "openai/gpt-oss-120b",
                     "messages": messages if not force_finish else messages + [{"role": "user", "content": "You have gathered enough information. Now write the complete research report immediately."}],
-                    "max_tokens": 4096,
+                    "max_tokens": 8000,
                 }
                 
                 if not force_finish:
@@ -111,7 +111,7 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
                             messages=messages + [{"role": "user", "content": "Stop using tools. Write the complete research report now based on what you have already read."}],
                             tools=tools_definition,
                             tool_choice="auto",
-                            max_tokens=4096,
+                            max_tokens=8000,
                         )
                         recovery_message = recovery_response.choices[0].message
                         if recovery_message.content and recovery_message.content.strip():
