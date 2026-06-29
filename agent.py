@@ -100,9 +100,27 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
                 response = client.chat.completions.create(**api_params)
 
             except Exception as e:
-                console.print(f"[red]⚠ API error: {str(e)[:200]}[/red]")
+                error_str = str(e)
+                console.print(f"[red]⚠ API error: {error_str[:200]}[/red]")
+                
+                # If model keeps calling tools after force_finish, ask it to write report WITH tools still available
+                if "tool_use_failed" in error_str or "tool choice is none" in error_str.lower():
+                    try:
+                        recovery_response = client.chat.completions.create(
+                            model="openai/gpt-oss-120b",
+                            messages=messages + [{"role": "user", "content": "Stop using tools. Write the complete research report now based on what you have already read."}],
+                            tools=tools_definition,
+                            tool_choice="auto",
+                            max_tokens=4096,
+                        )
+                        recovery_message = recovery_response.choices[0].message
+                        if recovery_message.content and recovery_message.content.strip():
+                            return recovery_message.content, sources
+                    except Exception:
+                        pass
+                
                 return "Sorry, the agent encountered an issue processing this topic. Please try rephrasing it or try again.", sources
-
+            
         message = response.choices[0].message
 
         # Check if model wants to call a tool
