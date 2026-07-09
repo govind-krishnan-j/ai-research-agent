@@ -1,10 +1,8 @@
 import os
 from datetime import datetime
-from rich.console import Console
 import re
 from fpdf import FPDF
 
-console = Console()
 
 def save_report(topic: str, content: str) -> str:
     """Save the final research report to a text file."""
@@ -24,8 +22,9 @@ def save_report(topic: str, content: str) -> str:
         f.write("=" * 60 + "\n\n")
         f.write(content)
 
-    console.print(f"\n[bold green][Report][/bold green] Saved to: [dim]{filepath}[/dim]")
+    print(f"[Report] Saved to: {filepath}")
     return filepath
+
 
 def generate_pdf_bytes(topic: str, content: str, sources: list = []) -> bytes:
     """Generate a PDF report and return it as bytes (for Streamlit download)."""
