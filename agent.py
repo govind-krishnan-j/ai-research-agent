@@ -299,7 +299,26 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
         try:
             response = call_llm(messages, allow_tools=not force_finish)
         except Exception as e:
-            return f"Sorry, the agent encountered an issue: {str(e)[:200]}", state["sources"]
+            error_str = str(e)
+
+            # gpt-oss-120b sometimes tries to call a tool even when tools are withheld.
+            # Recover by re-issuing the request WITH tools enabled but instructing it to stop.
+            if "tool_use_failed" in error_str or "tool choice is none" in error_str.lower():
+                try:
+                    recovery = call_llm(
+                        messages + [{
+                            "role": "user",
+                            "content": "Stop using tools. Write the complete research report now based on what you have already read."
+                        }],
+                        allow_tools=True
+                    )
+                    recovery_content = recovery.choices[0].message.content
+                    if recovery_content and recovery_content.strip():
+                        return recovery_content, state["sources"]
+                except Exception:
+                    pass
+
+            return f"Sorry, the agent encountered an issue: {error_str[:200]}", state["sources"]
 
         message = response.choices[0].message
 
