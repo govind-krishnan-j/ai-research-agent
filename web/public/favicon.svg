@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Research Atlas">
+  <rect width="64" height="64" rx="16" fill="#050505"/>
+  <g transform="rotate(-30 32 32)">
+    <rect x="13" y="13" width="38" height="38" rx="11" fill="none" stroke="#d8ff61" stroke-width="4"/>
+    <ellipse cx="32" cy="32" rx="20" ry="8" transform="rotate(-36 32 32)" fill="none" stroke="#d8ff61" stroke-width="3"/>
+    <circle cx="32" cy="32" r="4.5" fill="#d8ff61"/>
+  </g>
+</svg>
