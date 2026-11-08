@@ -2,7 +2,6 @@ import json
 import os
 import time
 
-import streamlit as st
 from dotenv import load_dotenv
 from groq import Groq
 
@@ -17,7 +16,7 @@ load_dotenv()
 API_KEY = os.getenv("GROQ_API_KEY")
 
 if not API_KEY:
-    API_KEY = st.secrets["GROQ_API_KEY"]
+    raise RuntimeError("GROQ_API_KEY is not set. Add it to your environment before starting the agent.")
 
 client = Groq(api_key=API_KEY)
 
