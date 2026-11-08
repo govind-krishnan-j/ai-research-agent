@@ -45,7 +45,7 @@ def research(request: ResearchRequest):
         raise HTTPException(status_code=502, detail="Research failed. Please try again.") from exc
 
     if report.startswith(("Sorry, the agent encountered", "The agent could not", "The agent completed research")):
-        raise HTTPException(status_code=502, detail=report)
+        raise HTTPException(status_code=502, detail="Research could not be completed. Please try again.")
 
     return {"topic": topic, "report": report, "sources": sources}
 
