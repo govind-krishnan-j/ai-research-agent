@@ -180,7 +180,10 @@ def call_llm(messages, allow_tools=True):
 
             return client.chat.completions.create(**params)
 
-        except Exception:
+        except Exception as exc:
+            # Invalid tool calls will not be fixed by retrying the same request.
+            if "tool_use_failed" in str(exc) or "tool choice is none" in str(exc).lower():
+                raise
 
             if attempt == MAX_RETRIES - 1:
                 raise
@@ -248,10 +251,12 @@ def execute_tool(tool_call, state):
 
         url = tool_args["url"]
 
-        if url not in state["sources"]:
-            state["sources"].append(url)
-
         result = available_tools[tool_name](**tool_args)
+
+        if not result.startswith(("Could not read page:", "Page content could not be extracted")):
+            if url not in state["sources"]:
+                state["sources"].append(url)
+            state["pages"].append((url, result))
 
         return {
             "content": result
@@ -260,6 +265,41 @@ def execute_tool(tool_call, state):
     return {
         "content": "Tool execution failed."
     }
+
+
+# ----------------------------------------------------
+# Final report from a clean, text-only conversation
+# ----------------------------------------------------
+
+
+def finish_report(topic: str, state) -> tuple[str, list[str]]:
+    if not state["pages"]:
+        return "The agent could not read enough source material. Please try again.", state["sources"]
+
+    source_text = "\n\n".join(
+        f"Source {index}: {url}\n{text}"
+        for index, (url, text) in enumerate(state["pages"], 1)
+    )
+    messages = [
+        {
+            "role": "system",
+            "content": "Write a research report using only the supplied source text. "
+                       "Return Markdown prose only. Do not request actions or tools. "
+                       "If the sources do not support a claim, omit it.",
+        },
+        {
+            "role": "user",
+            "content": f"{user_prompt(topic)}\n\nSource material:\n{source_text}",
+        },
+    ]
+    try:
+        response = call_llm(messages, allow_tools=False)
+        content = response.choices[0].message.content
+        if content and content.strip():
+            return content, state["sources"]
+    except Exception:
+        pass
+    return "The agent completed research but could not generate a report. Please try again.", state["sources"]
 
 
 # ----------------------------------------------------
@@ -279,6 +319,7 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
         "search_count": 0,
         "read_count": 0,
         "sources": [],
+        "pages": [],
     }
 
     for step in range(MAX_AGENT_STEPS):
@@ -290,39 +331,19 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
         )
 
         if force_finish:
-            messages.append({
-                "role": "user",
-                "content": "You have gathered enough information. Write the final report now."
-            })
+            return finish_report(topic, state)
 
         try:
-            response = call_llm(messages, allow_tools=not force_finish)
-        except Exception as e:
-            error_str = str(e)
-
-            # gpt-oss-120b sometimes tries to call a tool even when tools are withheld.
-            # Recover by re-issuing the request WITH tools enabled but instructing it to stop.
-            if "tool_use_failed" in error_str or "tool choice is none" in error_str.lower():
-                try:
-                    recovery = call_llm(
-                        messages + [{
-                            "role": "user",
-                            "content": "Stop using tools. Write the complete research report now based on what you have already read."
-                        }],
-                        allow_tools=True
-                    )
-                    recovery_content = recovery.choices[0].message.content
-                    if recovery_content and recovery_content.strip():
-                        return recovery_content, state["sources"]
-                except Exception:
-                    pass
-
-            return f"Sorry, the agent encountered an issue: {error_str[:200]}", state["sources"]
+            response = call_llm(messages)
+        except Exception:
+            if state["pages"]:
+                return finish_report(topic, state)
+            return "The agent could not complete research. Please try again.", state["sources"]
 
         message = response.choices[0].message
 
         # Model wants to call a tool (and we still allow it)
-        if message.tool_calls and not force_finish:
+        if message.tool_calls:
 
             messages.append({
                 "role": "assistant",
@@ -341,26 +362,15 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
 
             continue
 
-        # No tool calls (or forced) — treat as final report
+        # No tool calls — treat as final report
         content = message.content
 
         if not content or not content.strip():
-            # One recovery attempt with tools re-enabled
-            try:
-                recovery = call_llm(
-                    messages + [{
-                        "role": "user",
-                        "content": "Stop using tools. Write the complete report now based on what you already know."
-                    }],
-                    allow_tools=True
-                )
-                content = recovery.choices[0].message.content
-            except Exception:
-                content = None
+            return finish_report(topic, state)
 
         if not content or not content.strip():
             return "The agent completed research but could not generate a report. Please try again.", state["sources"]
 
         return content, state["sources"]
 
-    return "The agent could not complete the report within the step limit. Please try again.", state["sources"]
+    return finish_report(topic, state)

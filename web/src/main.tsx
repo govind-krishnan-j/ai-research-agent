@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import './style.css'
+import './motion.css'
 
 type ResearchResult = { topic: string; report: string; sources: string[] }
 type View = 'home' | 'about'
@@ -50,8 +51,24 @@ function App() {
   })
   const [view, setView] = useState<View>('home')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [workspaceCollapsed, setWorkspaceCollapsed] = useState(() => localStorage.getItem('research-atlas-workspace-collapsed') === 'true')
 
   useEffect(() => { localStorage.setItem('research-atlas-topics', JSON.stringify(history)) }, [history])
+  useEffect(() => { localStorage.setItem('research-atlas-workspace-collapsed', String(workspaceCollapsed)) }, [workspaceCollapsed])
+  useEffect(() => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduceMotion) return
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible')
+          observer.unobserve(entry.target)
+        }
+      })
+    }, { threshold: 0.12 })
+    document.querySelectorAll('.reveal').forEach(element => observer.observe(element))
+    return () => observer.disconnect()
+  }, [view, result, loading])
 
   async function research(nextTopic = topic) {
     const clean = nextTopic.trim()
@@ -111,8 +128,8 @@ function App() {
 
   const wordCount = result?.report.trim().split(/\s+/).length ?? 0
 
-  return <div className="app-shell">
-    <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
+  return <div className={`app-shell ${workspaceCollapsed ? 'workspace-collapsed' : ''}`}>
+    <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`} inert={workspaceCollapsed && !menuOpen}>
       <div className="sidebar-top">
         <Logo />
         <button className="mobile-close icon-button" onClick={() => setMenuOpen(false)} aria-label="Close menu"><Icon name="close" /></button>
@@ -134,9 +151,14 @@ function App() {
     {menuOpen && <button className="mobile-scrim" aria-label="Close menu" onClick={() => setMenuOpen(false)} />}
 
     <main className="main-panel">
+      <div className="page-grid" aria-hidden="true" />
+      <div className="page-glow" aria-hidden="true" />
       <header className="topbar">
-        <button className="mobile-menu icon-button" onClick={() => setMenuOpen(true)} aria-label="Open menu"><Icon name="menu" /></button>
-        <div className="breadcrumb"><span>WORKSPACE</span><span className="slash">/</span><strong>{view === 'about' ? 'How it works' : result ? 'Research report' : 'New research'}</strong></div>
+        <div className="topbar-left">
+          <button className="mobile-menu icon-button" onClick={() => setMenuOpen(true)} aria-label="Open menu"><Icon name="menu" /></button>
+          <button className="workspace-toggle icon-button" onClick={() => setWorkspaceCollapsed(value => !value)} aria-label={workspaceCollapsed ? 'Expand workspace' : 'Collapse workspace'} aria-expanded={!workspaceCollapsed} title={workspaceCollapsed ? 'Expand workspace' : 'Collapse workspace'}><Icon name="menu" size={20} /></button>
+          <div className="breadcrumb"><span>WORKSPACE</span><span className="slash">/</span><strong>{view === 'about' ? 'How it works' : result ? 'Research report' : 'New research'}</strong></div>
+        </div>
         <div className="topbar-right"><span className="topbar-indicator" /> AI RESEARCH ASSISTANT <span className="topbar-version">V1.0</span></div>
       </header>
 
@@ -144,7 +166,7 @@ function App() {
         <div className="eyebrow"><span /> BEHIND THE RESEARCH</div>
         <h1>From question to <em>clarity.</em></h1>
         <p className="hero-copy">Research Atlas uses an AI agent to search the web, read relevant pages, and assemble a structured report. Sources appear alongside the finished work so you can inspect them yourself.</p>
-        <div className="about-grid">
+        <div className="about-grid reveal">
           <div><span className="step-number">01</span><Icon name="search" /><h3>Search</h3><p>The agent looks for relevant pages on your topic.</p></div>
           <div><span className="step-number">02</span><Icon name="book" /><h3>Read</h3><p>It extracts text from selected sources.</p></div>
           <div><span className="step-number">03</span><Icon name="spark" /><h3>Synthesize</h3><p>It writes a report based on what it gathered.</p></div>
@@ -154,13 +176,14 @@ function App() {
         <div className="result-heading"><div><div className="eyebrow"><span /> RESEARCH COMPLETE</div><h1>{result.topic}</h1><div className="result-meta"><span><Icon name="document" size={16} /> {wordCount} words</span><span><Icon name="clock" size={16} /> ~{Math.max(1, Math.round(wordCount / 200))} min read</span><span><Icon name="book" size={16} /> {result.sources.length} sources</span></div></div></div>
         <div className="result-actions"><button className="subtle-button" onClick={() => { setResult(null); setTopic('') }}>+ New research</button><button className="subtle-button" onClick={downloadText}><Icon name="download" size={17} /> Text</button><button className="primary-button" onClick={downloadPdf} disabled={pdfLoading}><Icon name="download" size={17} /> {pdfLoading ? 'Preparing…' : 'Download PDF'}</button></div>
         {error && <div className="alert" role="alert">{error}</div>}
-        <div className="report-grid"><article className="report-card"><div className="card-overline">THE REPORT <span>✦</span></div><div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{result.report}</ReactMarkdown></div></article><aside className="sources-card"><div className="card-overline">SOURCE MATERIAL <span>{String(result.sources.length).padStart(2, '0')}</span></div>{result.sources.length ? result.sources.map((url, i) => { let host = url; try { host = new URL(url).hostname.replace(/^www\./, '') } catch { /* show original */ } return <a key={`${url}-${i}`} href={/^https?:\/\//i.test(url) ? url : '#'} target="_blank" rel="noopener noreferrer"><span className="source-number">{String(i + 1).padStart(2, '0')}</span><span className="source-info"><strong>{host}</strong><small>{url}</small></span><Icon name="external" size={16} /></a> }) : <p className="no-sources">No readable sources were returned. Review this report carefully.</p>}<p className="sources-note">Open the original pages to verify important claims.</p></aside></div>
+        <div className="report-grid reveal"><article className="report-card"><div className="card-overline">THE REPORT <span>✦</span></div><div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{result.report}</ReactMarkdown></div></article><aside className="sources-card"><div className="card-overline">SOURCE MATERIAL <span>{String(result.sources.length).padStart(2, '0')}</span></div>{result.sources.length ? result.sources.map((url, i) => { let host = url; try { host = new URL(url).hostname.replace(/^www\./, '') } catch { /* show original */ } return <a key={`${url}-${i}`} href={/^https?:\/\//i.test(url) ? url : '#'} target="_blank" rel="noopener noreferrer"><span className="source-number">{String(i + 1).padStart(2, '0')}</span><span className="source-info"><strong>{host}</strong><small>{url}</small></span><Icon name="external" size={16} /></a> }) : <p className="no-sources">No readable sources were returned. Review this report carefully.</p>}<p className="sources-note">Open the original pages to verify important claims.</p></aside></div>
       </section> : <section className="home-page content-width">
-        <div className="ambient ambient-one" /><div className="ambient ambient-two" />
-        <div className="hero"><div className="eyebrow"><span /> THE INTELLIGENT RESEARCH WORKSPACE</div><h1>Go deeper.<br /><em>Find clarity.</em></h1><p className="hero-copy">Turn any question into a thoughtful, source-backed report. Our AI agent searches, reads, and connects the dots for you.</p></div>
-        <div className="research-box"><div className="research-box-top"><div><span className="input-kicker">YOUR NEXT DISCOVERY STARTS HERE</span><h2>What would you like to explore?</h2></div><span className="box-spark">✳</span></div><form onSubmit={event => { event.preventDefault(); research() }}><label className="sr-only" htmlFor="topic">Research topic</label><div className="input-row"><Icon name="search" size={21} /><input id="topic" value={topic} onChange={event => setTopic(event.target.value)} placeholder="Enter a topic, question, or idea..." maxLength={300} disabled={loading} autoFocus /><button type="submit" disabled={loading || topic.trim().length < 2}><span>{loading ? 'Researching…' : 'Start research'}</span><Icon name="arrow" size={18} /></button></div></form>{error && <div className="alert" role="alert">{error}</div>}<div className="suggestion-row"><span>TRY AN IDEA</span>{suggestions.map(item => <button key={item} onClick={() => { setTopic(item); research(item) }} disabled={loading}>{item}<span>↗</span></button>)}</div></div>
+        <div className="hero-visual" aria-hidden="true"><div className="orbit orbit-outer" /><div className="orbit orbit-middle" /><div className="orbit orbit-inner" /><div className="orbit-core">✳</div><span className="orbit-label orbit-label-top">IDEAS IN MOTION</span><span className="orbit-label orbit-label-bottom">EXPLORE / CONNECT / DISCOVER</span></div>
+        <div className="hero"><div className="eyebrow"><span /> RESEARCH WITHOUT LIMITS</div><h1>CHASE THE<br /><em>UNKNOWN.</em></h1><p className="hero-copy">One thought can take you anywhere. Give it a direction, and let the agent search, read, and connect the dots.</p><a className="scroll-cue" href="#research-input"><span>SCROLL TO EXPLORE</span><span className="scroll-cue-line" /></a></div>
+        <div className="research-box reveal" id="research-input"><div className="research-box-top"><div><span className="input-kicker">01 / START WITH A QUESTION</span><h2>What’s on your mind?</h2></div><span className="box-spark">✳</span></div><form onSubmit={event => { event.preventDefault(); research() }}><label className="sr-only" htmlFor="topic">Research topic</label><div className="input-row"><Icon name="search" size={21} /><input id="topic" value={topic} onChange={event => setTopic(event.target.value)} placeholder="Enter a topic, question, or idea..." maxLength={300} disabled={loading} autoFocus /><button type="submit" disabled={loading || topic.trim().length < 2}><span>{loading ? 'Researching…' : 'Start research'}</span><Icon name="arrow" size={18} /></button></div></form>{error && <div className="alert" role="alert">{error}</div>}<div className="suggestion-row"><span>TRY AN IDEA</span>{suggestions.map(item => <button key={item} onClick={() => { setTopic(item); research(item) }} disabled={loading}>{item}<span>↗</span></button>)}</div></div>
         {loading ? <div className="working-card" role="status"><span className="working-spinner" /><div><strong>Research in progress</strong><p>The agent is searching and reading sources. This may take a minute.</p></div></div> : null}
-        <div className="feature-section"><div className="section-heading"><span>BUILT FOR THE CURIOUS</span><h2>More than a search.<br /><em>A clearer picture.</em></h2></div><div className="feature-grid"><div className="feature-card"><div className="feature-icon"><Icon name="search" /></div><span>01 / DISCOVER</span><h3>Explore broadly</h3><p>Relevant web results give the agent a starting point for your topic.</p></div><div className="feature-card"><div className="feature-icon"><Icon name="book" /></div><span>02 / UNDERSTAND</span><h3>Read the sources</h3><p>The agent extracts useful context from selected pages before writing.</p></div><div className="feature-card"><div className="feature-icon"><Icon name="document" /></div><span>03 / CONNECT</span><h3>Get the full story</h3><p>Receive a structured report with source links and PDF export.</p></div></div></div>
+        <div className="interlude reveal"><div className="interlude-scan" aria-hidden="true" /><div className="interlude-top"><span>AN OPEN QUESTION</span><span>✳ &nbsp; 001</span></div><div className="interlude-body"><div className="interlude-type">WHAT <span>IF?</span></div><p>Every discovery begins here. Follow a question far enough and the whole picture starts to change.</p></div><a className="interlude-link" href="#how-it-works">SEE HOW IT WORKS <Icon name="arrow" size={17} /></a><div className="interlude-corner" aria-hidden="true">↗</div></div>
+        <div className="feature-section" id="how-it-works"><div className="section-heading reveal"><span>02 / HOW IT WORKS</span><h2>More than a search.<br /><em>A clearer picture.</em></h2></div><div className="feature-grid"><div className="feature-card reveal"><div className="feature-icon"><Icon name="search" /></div><span>01 / DISCOVER</span><h3>Explore broadly</h3><p>Relevant web results give the agent a starting point for your topic.</p></div><div className="feature-card reveal"><div className="feature-icon"><Icon name="book" /></div><span>02 / UNDERSTAND</span><h3>Read the sources</h3><p>The agent extracts useful context from selected pages before writing.</p></div><div className="feature-card reveal"><div className="feature-icon"><Icon name="document" /></div><span>03 / CONNECT</span><h3>Get the full story</h3><p>Receive a structured report with source links and PDF export.</p></div></div></div>
       </section>}
       <footer className="footer"><span>© {new Date().getFullYear()} RESEARCH ATLAS</span><span>AN IDEA CAN TAKE YOU ANYWHERE <span className="footer-star">✳</span></span></footer>
     </main>
