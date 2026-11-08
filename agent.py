@@ -84,7 +84,7 @@ Write a report containing:
 - Conclusion
 
 Maximum length:
-700 words.
+1000 words.
 """
 
 # ----------------------------------------------------
