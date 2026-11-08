@@ -3,5 +3,6 @@ requests
 beautifulsoup4
 ddgs
 python-dotenv
-streamlit
 fpdf2
+fastapi
+uvicorn

@@ -27,7 +27,7 @@ def save_report(topic: str, content: str) -> str:
 
 
 def generate_pdf_bytes(topic: str, content: str, sources: list = []) -> bytes:
-    """Generate a PDF report and return it as bytes (for Streamlit download)."""
+    """Generate a PDF report and return it as bytes for download."""
     pdf = FPDF()
     pdf.add_page()
 

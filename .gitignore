@@ -3,3 +3,6 @@
 __pycache__/
 *.pyc
 reports/
+web/node_modules/
+web/dist/
+web/tsconfig.tsbuildinfo
