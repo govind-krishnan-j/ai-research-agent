@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import './style.css'
 import './motion.css'
+import './launchpad.css'
 
 type ResearchResult = { topic: string; report: string; sources: string[] }
 type View = 'home' | 'about'
@@ -38,6 +39,25 @@ function Logo() {
     <span className="logo-mark"><span className="logo-orbit" /><span className="logo-center" /></span>
     <span className="logo-word">research<span>atlas</span><span className="logo-dot">.</span></span>
   </div>
+}
+
+const researchTracks = [
+  { name: 'Technology', symbol: '⌘', title: 'Beyond the next breakthrough.', question: 'How are AI agents changing the way software is built?', angles: ['Emerging tools', 'Practical applications', 'Current limitations'] },
+  { name: 'Science', symbol: '✳', title: 'Big questions. New frontiers.', question: 'What are the biggest challenges in making fusion energy practical?', angles: ['Recent research', 'Engineering challenges', 'Future outlook'] },
+  { name: 'Climate', symbol: '↗', title: 'A changing world, explained.', question: 'How can cities reduce the urban heat island effect?', angles: ['Causes and evidence', 'Real-world approaches', 'Trade-offs'] },
+  { name: 'Business', symbol: '▥', title: 'Understand what moves markets.', question: 'How is the circular economy changing product design?', angles: ['Business models', 'Industry examples', 'Barriers to adoption'] },
+]
+
+function ResearchLaunchpad({ onChoose, disabled }: { onChoose: (question: string) => void; disabled: boolean }) {
+  const [selected, setSelected] = useState(0)
+  const track = researchTracks[selected]
+  return <section className="launchpad reveal" aria-label="Research launchpad">
+    <div className="launchpad-heading"><span>THE RESEARCH LAUNCHPAD</span><h2>Pick a direction.<br /><em>Go somewhere new.</em></h2><p>Start with a question worth exploring.</p></div>
+    <div className="launchpad-layout">
+      <div className="launchpad-tracks" aria-label="Choose a subject">{researchTracks.map((item, index) => <button key={item.name} className={selected === index ? 'selected' : ''} aria-pressed={selected === index} onClick={() => setSelected(index)}><span className="track-number">0{index + 1}</span><strong>{item.name}</strong><span className="track-arrow">↗</span></button>)}</div>
+      <div className="launchpad-brief" aria-live="polite"><div className="brief-watermark" aria-hidden="true">{track.symbol}</div><div className="brief-label">{track.name.toUpperCase()} / QUESTION STARTER</div><h3>{track.title}</h3><div className="brief-question"><Icon name="search" size={20} /><p>{track.question}</p></div><div className="brief-angles">{track.angles.map(angle => <span key={angle}>{angle}</span>)}</div><button className="brief-cta" disabled={disabled} onClick={() => onChoose(track.question)}>Use this question <Icon name="arrow" size={19} /></button></div>
+    </div>
+  </section>
 }
 
 function App() {
@@ -182,11 +202,7 @@ function App() {
         <div className="hero"><div className="eyebrow"><span /> RESEARCH WITHOUT LIMITS</div><h1>CHASE THE<br /><em>UNKNOWN.</em></h1><p className="hero-copy">One thought can take you anywhere. Give it a direction, and let the agent search, read, and connect the dots.</p><a className="scroll-cue" href="#research-input"><span>SCROLL TO EXPLORE</span><span className="scroll-cue-line" /></a></div>
         <div className="research-box reveal" id="research-input"><div className="research-box-top"><div><span className="input-kicker">01 / START WITH A QUESTION</span><h2>What’s on your mind?</h2></div><span className="box-spark">✳</span></div><form onSubmit={event => { event.preventDefault(); research() }}><label className="sr-only" htmlFor="topic">Research topic</label><div className="input-row"><Icon name="search" size={21} /><input id="topic" value={topic} onChange={event => setTopic(event.target.value)} placeholder="Enter a topic, question, or idea..." maxLength={300} disabled={loading} autoFocus /><button type="submit" disabled={loading || topic.trim().length < 2}><span>{loading ? 'Researching…' : 'Start research'}</span><Icon name="arrow" size={18} /></button></div></form>{error && <div className="alert" role="alert">{error}</div>}<div className="suggestion-row"><span>TRY AN IDEA</span>{suggestions.map(item => <button key={item} onClick={() => { setTopic(item); research(item) }} disabled={loading}>{item}<span>↗</span></button>)}</div></div>
         {loading ? <div className="working-card" role="status"><span className="working-spinner" /><div><strong>Research in progress</strong><p>The agent is searching and reading sources. This may take a minute.</p></div></div> : null}
-        <section className="signal-stage reveal" aria-label="From a question to a researched answer" onPointerMove={event => { const rect = event.currentTarget.getBoundingClientRect(); event.currentTarget.style.setProperty('--pointer-x', `${(event.clientX - rect.left - rect.width / 2) * 0.025}px`); event.currentTarget.style.setProperty('--pointer-y', `${(event.clientY - rect.top - rect.height / 2) * 0.025}px`) }} onPointerLeave={event => { event.currentTarget.style.setProperty('--pointer-x', '0px'); event.currentTarget.style.setProperty('--pointer-y', '0px') }}>
-          <div className="signal-copy"><span className="signal-index"><span className="signal-live-dot" /> THE DISCOVERY ENGINE / 001</span><h2>FOLLOW<br />THE <em>SIGNAL.</em></h2><p>A question sets everything in motion. Watch scattered information become a clearer story.</p><a href="#how-it-works">EXPLORE THE PROCESS <Icon name="arrow" size={18} /></a></div>
-          <div className="signal-art" aria-hidden="true"><div className="signal-field" /><div className="signal-ring signal-ring-outer" /><div className="signal-ring signal-ring-mid" /><div className="signal-ring signal-ring-inner" /><div className="signal-sweep" /><div className="signal-core"><span>✳</span><small>RESEARCH<br />ATLAS</small></div><div className="signal-tag signal-tag-one"><b>01</b> SEARCH <i>↗</i></div><div className="signal-tag signal-tag-two"><b>02</b> READ <i>↗</i></div><div className="signal-tag signal-tag-three"><b>03</b> SYNTHESIZE <i>↗</i></div><span className="signal-pin signal-pin-one" /><span className="signal-pin signal-pin-two" /><span className="signal-pin signal-pin-three" /></div>
-          <div className="signal-bottom"><span>QUESTION INPUT</span><span className="signal-progress"><i /></span><span>INSIGHT OUTPUT</span></div>
-        </section>
+        <ResearchLaunchpad disabled={loading} onChoose={question => { setTopic(question); document.getElementById('topic')?.focus({ preventScroll: true }); document.getElementById('research-input')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' }) }} />
         <div className="feature-section" id="how-it-works"><div className="section-heading reveal"><span>02 / HOW IT WORKS</span><h2>More than a search.<br /><em>A clearer picture.</em></h2></div><div className="feature-grid"><div className="feature-card reveal"><div className="feature-icon"><Icon name="search" /></div><span>01 / DISCOVER</span><h3>Explore broadly</h3><p>Relevant web results give the agent a starting point for your topic.</p></div><div className="feature-card reveal"><div className="feature-icon"><Icon name="book" /></div><span>02 / UNDERSTAND</span><h3>Read the sources</h3><p>The agent extracts useful context from selected pages before writing.</p></div><div className="feature-card reveal"><div className="feature-icon"><Icon name="document" /></div><span>03 / CONNECT</span><h3>Get the full story</h3><p>Receive a structured report with source links and PDF export.</p></div></div></div>
       </section>}
       <footer className="footer"><span>© {new Date().getFullYear()} RESEARCH ATLAS</span><span>AN IDEA CAN TAKE YOU ANYWHERE <span className="footer-star">✳</span></span></footer>

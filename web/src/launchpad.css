@@ -1,0 +1,23 @@
+.launchpad{margin-top:105px;padding:50px 0 0;border-top:1px solid #343a2b}
+.launchpad-heading>span{font-size:10px;font-weight:800;letter-spacing:2px;color:#d8ff61}
+.launchpad-heading h2{font-family:Manrope,sans-serif;font-size:clamp(36px,4.4vw,64px);line-height:1.08;letter-spacing:-3px;margin:23px 0 18px}
+.launchpad-heading h2 em{font-style:normal;color:#d8ff61}
+.launchpad-heading p{font-size:14px;color:#9ca392;margin:0}
+.launchpad-layout{display:grid;grid-template-columns:1fr 1.65fr;gap:36px;margin-top:45px;align-items:stretch}
+.launchpad-tracks{display:flex;flex-direction:column;justify-content:center;gap:3px}
+.launchpad-tracks button{display:flex;align-items:center;gap:19px;text-align:left;padding:25px 20px;border:0;border-bottom:1px solid #30352a;background:transparent;color:#8e9782;transition:color .25s,background .25s,padding .25s}
+.launchpad-tracks button.selected{background:#d8ff61;color:#101507;border-radius:8px;border-color:transparent;padding-left:28px;box-shadow:0 8px 40px #d8ff6115}
+.launchpad-tracks button:hover:not(.selected){background:#151a0e;color:#d8ff61}
+.track-number{font-size:10px;font-weight:800;letter-spacing:1px;opacity:.65}
+.launchpad-tracks strong{font-family:Manrope,sans-serif;font-size:21px;letter-spacing:-.6px}.track-arrow{margin-left:auto;font-size:23px}
+.launchpad-brief{position:relative;isolation:isolate;overflow:hidden;min-height:390px;border:1px solid #424f30;border-radius:16px;padding:35px;background:linear-gradient(135deg,#171f10,#090b07 72%);display:flex;flex-direction:column}
+.launchpad-brief::before{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;background-image:linear-gradient(#d8ff6106 1px,transparent 1px),linear-gradient(90deg,#d8ff6106 1px,transparent 1px);background-size:30px 30px;mask-image:linear-gradient(90deg,transparent,#000)}
+.brief-label{font-size:9px;font-weight:800;letter-spacing:1.8px;color:#d8ff61}
+.launchpad-brief h3{max-width:380px;font-family:Manrope,sans-serif;font-size:clamp(26px,3vw,38px);letter-spacing:-1.5px;line-height:1.15;color:#f0f3e9;margin:25px 0}
+.brief-watermark{position:absolute;right:-15px;top:-50px;z-index:-1;font-size:280px;font-weight:800;color:#d8ff610b;line-height:1.2;transform:rotate(-12deg);pointer-events:none}
+.brief-question{display:flex;align-items:flex-start;gap:12px;max-width:500px;color:#d8ff61}.brief-question svg{flex:none;margin-top:4px}.brief-question p{font-size:15px;color:#c9d2bb;line-height:1.7;margin:0}
+.brief-angles{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 30px}.brief-angles span{font-size:10px;color:#98a788;padding:6px 8px;border:1px solid #39482b;border-radius:4px;background:#11180d}
+.brief-cta{display:flex;align-items:center;justify-content:space-between;gap:20px;align-self:stretch;margin-top:auto;border:0;border-top:1px solid #425531;background:transparent;color:#d8ff61;text-align:left;padding:18px 0 0;font-size:12px;font-weight:800}.brief-cta:hover{color:#f0ffb2}.brief-cta svg{transition:transform .2s}.brief-cta:hover svg{transform:translateX(5px)}
+@media(max-width:900px){.launchpad-layout{grid-template-columns:1fr;gap:20px}.launchpad-tracks{display:grid;grid-template-columns:1fr 1fr;gap:8px}.launchpad-tracks button{padding:17px 14px;border:1px solid #30352a;border-radius:7px;gap:10px}.launchpad-tracks button.selected{padding-left:14px}.launchpad-tracks strong{font-size:17px}.launchpad-brief{min-height:350px}}
+@media(max-width:500px){.launchpad{margin-top:80px;padding-top:35px}.launchpad-heading h2{font-size:36px;letter-spacing:-2px}.launchpad-tracks strong{font-size:14px}.track-number{font-size:9px}.track-arrow{font-size:17px}.launchpad-layout{margin-top:28px}.launchpad-brief{padding:25px;min-height:370px}.launchpad-brief h3{font-size:28px}.brief-question p{font-size:13px}}
+@media(prefers-reduced-motion:reduce){.launchpad-tracks button,.brief-cta svg{transition:none}}
