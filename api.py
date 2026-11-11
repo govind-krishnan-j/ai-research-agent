@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from agent import run_agent
+from agent import ResearchError, research_topic
 from report import generate_pdf_bytes
 
 
@@ -40,12 +40,11 @@ def research(request: ResearchRequest):
         raise HTTPException(status_code=422, detail="Enter a research topic.")
 
     try:
-        report, sources = run_agent(topic)
+        report, sources = research_topic(topic)
+    except ResearchError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail="Research failed. Please try again.") from exc
-
-    if report.startswith(("Sorry, the agent encountered", "The agent could not", "The agent completed research")):
-        raise HTTPException(status_code=502, detail="Research could not be completed. Please try again.")
 
     return {"topic": topic, "report": report, "sources": sources}
 

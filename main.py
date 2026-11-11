@@ -1,4 +1,4 @@
-from agent import run_agent
+from agent import ResearchError, research_topic
 from report import save_report
 
 
@@ -14,8 +14,11 @@ def main():
         print("No topic entered. Exiting.")
         return
 
-    # run_agent now returns (report, sources)
-    report_content, sources = run_agent(topic)
+    try:
+        report_content, sources = research_topic(topic)
+    except ResearchError as exc:
+        print(str(exc))
+        return
 
     # Append sources to report
     if sources:
