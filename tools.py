@@ -21,6 +21,7 @@ def read_page(url: str, **kwargs) -> str:
     try:
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"}
         response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
 
         for tag in soup(["script", "style", "nav", "footer", "header"]):
@@ -31,7 +32,7 @@ def read_page(url: str, **kwargs) -> str:
         if len(text) < 100:
             return "Page content could not be extracted (possibly JavaScript-rendered)."
 
-        return text[:1500]
+        return text[:6000]
 
     except Exception as e:
         return f"Could not read page: {str(e)}"

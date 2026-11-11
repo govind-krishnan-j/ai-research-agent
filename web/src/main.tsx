@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -7,6 +7,20 @@ import './motion.css'
 import './launchpad.css'
 
 type ResearchResult = { topic: string; report: string; sources: string[] }
+type ExportState = { status: 'idle' | 'preparing' } | { status: 'failed'; message: string }
+type ResearchState =
+  | { status: 'idle' | 'running' }
+  | { status: 'failed'; message: string }
+  | { status: 'ready'; result: ResearchResult; pdf: ExportState }
+
+function readPreference(key: string) {
+  try { return localStorage.getItem(key) } catch { return null }
+}
+
+function writePreference(key: string, value: string) {
+  try { localStorage.setItem(key, value) } catch { /* Keep in-memory preferences for this visit. */ }
+}
+
 type View = 'home' | 'about'
 
 const suggestions = [
@@ -62,19 +76,24 @@ function ResearchLaunchpad({ onChoose, disabled }: { onChoose: (question: string
 
 function App() {
   const [topic, setTopic] = useState('')
-  const [result, setResult] = useState<ResearchResult | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [pdfLoading, setPdfLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [session, setSession] = useState<ResearchState>({ status: 'idle' })
+  const researchPending = useRef(false)
+  const exportRequest = useRef<AbortController | null>(null)
+  const loading = session.status === 'running'
+  const result = session.status === 'ready' ? session.result : null
+  const pdfLoading = session.status === 'ready' && session.pdf.status === 'preparing'
   const [history, setHistory] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('research-atlas-topics') || '[]') } catch { return [] }
+    try {
+      const stored: unknown = JSON.parse(readPreference('research-atlas-topics') || '[]')
+      return Array.isArray(stored) ? stored.filter((item): item is string => typeof item === 'string').slice(0, 6) : []
+    } catch { return [] }
   })
   const [view, setView] = useState<View>('home')
   const [menuOpen, setMenuOpen] = useState(false)
-  const [workspaceCollapsed, setWorkspaceCollapsed] = useState(() => localStorage.getItem('research-atlas-workspace-collapsed') === 'true')
+  const [workspaceCollapsed, setWorkspaceCollapsed] = useState(() => readPreference('research-atlas-workspace-collapsed') === 'true')
 
-  useEffect(() => { localStorage.setItem('research-atlas-topics', JSON.stringify(history)) }, [history])
-  useEffect(() => { localStorage.setItem('research-atlas-workspace-collapsed', String(workspaceCollapsed)) }, [workspaceCollapsed])
+  useEffect(() => { writePreference('research-atlas-topics', JSON.stringify(history)) }, [history])
+  useEffect(() => { writePreference('research-atlas-workspace-collapsed', String(workspaceCollapsed)) }, [workspaceCollapsed])
   useEffect(() => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (reduceMotion) return
@@ -90,48 +109,68 @@ function App() {
     return () => observer.disconnect()
   }, [view, result, loading])
 
+  function clearExport() {
+    exportRequest.current?.abort()
+    exportRequest.current = null
+  }
+
   async function research(nextTopic = topic) {
+    if (researchPending.current) return
     const clean = nextTopic.trim()
-    if (clean.length < 2) { setError('Enter a topic with at least two characters.'); return }
+    if (clean.length < 2) { setSession({ status: 'failed', message: 'Enter a topic with at least two characters.' }); return }
     setTopic(clean)
     setView('home')
-    setResult(null)
-    setError('')
-    setLoading(true)
+    clearExport()
+    researchPending.current = true
+    setSession({ status: 'running' })
     setMenuOpen(false)
     try {
       const response = await fetch(`${API}/research`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic: clean }),
       })
-      const data = await response.json()
-      if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Research failed. Please try again.')
-      setResult(data as ResearchResult)
+      const data = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(typeof data?.detail === 'string' ? data.detail : 'Research failed. Please try again.')
+      if (typeof data?.topic !== 'string' || typeof data.report !== 'string' ||
+          !Array.isArray(data.sources) || !data.sources.every((url: unknown) => typeof url === 'string')) {
+        throw new Error('The server returned an incomplete report. Please try again.')
+      }
+      setSession({ status: 'ready', result: data, pdf: { status: 'idle' } })
       setHistory(previous => [clean, ...previous.filter(item => item.toLowerCase() !== clean.toLowerCase())].slice(0, 6))
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not connect to the research server.')
-    } finally { setLoading(false) }
+      setSession({ status: 'failed', message: cause instanceof Error ? cause.message : 'Could not connect to the research server.' })
+    } finally { researchPending.current = false }
   }
 
   async function downloadPdf() {
-    if (!result) return
-    setPdfLoading(true)
-    setError('')
+    if (!result || exportRequest.current) return
+    const request = new AbortController()
+    exportRequest.current = request
+    function updateExport(pdf: ExportState) {
+      setSession(current => current.status === 'ready' && current.result === result ? { ...current, pdf } : current)
+    }
+    updateExport({ status: 'preparing' })
     try {
       const response = await fetch(`${API}/pdf`, {
+        signal: request.signal,
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic: result.topic, content: result.report, sources: result.sources }),
       })
       if (!response.ok) throw new Error('Could not create the PDF. Please try again.')
       const blob = await response.blob()
+      if (request.signal.aborted) return
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
       link.download = `${result.topic.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 60)}_report.pdf`
       link.click()
       URL.revokeObjectURL(url)
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create the PDF.') }
-    finally { setPdfLoading(false) }
+      updateExport({ status: 'idle' })
+    } catch (cause) {
+      if (!request.signal.aborted) updateExport({ status: 'failed', message: cause instanceof Error ? cause.message : 'Could not create the PDF.' })
+    } finally {
+      if (exportRequest.current === request) exportRequest.current = null
+    }
   }
 
   function downloadText() {
@@ -194,13 +233,13 @@ function App() {
         <button className="primary-button" onClick={() => setView('home')}>Start researching <Icon name="arrow" size={18} /></button>
       </section> : result ? <section className="result-page content-width">
         <div className="result-heading"><div><div className="eyebrow"><span /> RESEARCH COMPLETE</div><h1>{result.topic}</h1><div className="result-meta"><span><Icon name="document" size={16} /> {wordCount} words</span><span><Icon name="clock" size={16} /> ~{Math.max(1, Math.round(wordCount / 200))} min read</span><span><Icon name="book" size={16} /> {result.sources.length} sources</span></div></div></div>
-        <div className="result-actions"><button className="subtle-button" onClick={() => { setResult(null); setTopic('') }}>+ New research</button><button className="subtle-button" onClick={downloadText}><Icon name="download" size={17} /> Text</button><button className="primary-button" onClick={downloadPdf} disabled={pdfLoading}><Icon name="download" size={17} /> {pdfLoading ? 'Preparing…' : 'Download PDF'}</button></div>
-        {error && <div className="alert" role="alert">{error}</div>}
+        <div className="result-actions"><button className="subtle-button" onClick={() => { clearExport(); setSession({ status: 'idle' }); setTopic('') }}>+ New research</button><button className="subtle-button" onClick={downloadText}><Icon name="download" size={17} /> Text</button><button className="primary-button" onClick={downloadPdf} disabled={pdfLoading}><Icon name="download" size={17} /> {pdfLoading ? 'Preparing…' : 'Download PDF'}</button></div>
+        {session.status === 'ready' && session.pdf.status === 'failed' && <div className="alert" role="alert">{session.pdf.message}</div>}
         <div className="report-grid reveal"><article className="report-card"><div className="card-overline">THE REPORT <span>✦</span></div><div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{result.report}</ReactMarkdown></div></article><aside className="sources-card"><div className="card-overline">SOURCE MATERIAL <span>{String(result.sources.length).padStart(2, '0')}</span></div>{result.sources.length ? result.sources.map((url, i) => { let host = url; try { host = new URL(url).hostname.replace(/^www\./, '') } catch { /* show original */ } return <a key={`${url}-${i}`} href={/^https?:\/\//i.test(url) ? url : '#'} target="_blank" rel="noopener noreferrer"><span className="source-number">{String(i + 1).padStart(2, '0')}</span><span className="source-info"><strong>{host}</strong><small>{url}</small></span><Icon name="external" size={16} /></a> }) : <p className="no-sources">No readable sources were returned. Review this report carefully.</p>}<p className="sources-note">Open the original pages to verify important claims.</p></aside></div>
       </section> : <section className="home-page content-width">
         <div className="hero-research" aria-hidden="true"><div className="hero-research-head"><span><span className="hero-research-live" /> AGENT WORKFLOW</span><span>RUN / 001</span></div><div className="hero-query"><Icon name="search" size={19} /><span>YOUR QUESTION</span><strong>Where could this lead?</strong></div><div className="hero-flow"><div className="hero-flow-line" /><div className="hero-flow-step"><span className="hero-flow-icon"><Icon name="search" size={17} /></span><div><small>01 / DISCOVER</small><strong>Search the web</strong><i className="hero-flow-bar bar-one" /></div><b>↗</b></div><div className="hero-flow-step"><span className="hero-flow-icon"><Icon name="book" size={17} /></span><div><small>02 / VERIFY</small><strong>Read source pages</strong><i className="hero-flow-bar bar-two" /></div><b>↗</b></div><div className="hero-flow-step"><span className="hero-flow-icon"><Icon name="spark" size={17} /></span><div><small>03 / CONNECT</small><strong>Synthesize findings</strong><i className="hero-flow-bar bar-three" /></div><b>↗</b></div></div><div className="hero-output"><div><span>✳ REPORT READY</span><strong>Answers with sources.</strong></div><Icon name="document" size={24} /></div><div className="hero-research-foot"><span>SEARCH → READ → WRITE</span><span>AI RESEARCH ASSISTANT</span></div></div>
         <div className="hero"><div className="eyebrow"><span /> RESEARCH WITHOUT LIMITS</div><h1>CHASE THE<br /><em>UNKNOWN.</em></h1><p className="hero-copy">One thought can take you anywhere. Give it a direction, and let the agent search, read, and connect the dots.</p><a className="scroll-cue" href="#research-input"><span>SCROLL TO EXPLORE</span><span className="scroll-cue-line" /></a></div>
-        <div className="research-box reveal" id="research-input"><div className="research-box-top"><div><span className="input-kicker">01 / START WITH A QUESTION</span><h2>What’s on your mind?</h2></div><span className="box-spark">✳</span></div><form onSubmit={event => { event.preventDefault(); research() }}><label className="sr-only" htmlFor="topic">Research topic</label><div className="input-row"><Icon name="search" size={21} /><input id="topic" value={topic} onChange={event => setTopic(event.target.value)} placeholder="Enter a topic, question, or idea..." maxLength={300} disabled={loading} autoFocus /><button type="submit" disabled={loading || topic.trim().length < 2}><span>{loading ? 'Researching…' : 'Start research'}</span><Icon name="arrow" size={18} /></button></div></form>{error && <div className="alert" role="alert">{error}</div>}<div className="suggestion-row"><span>TRY AN IDEA</span>{suggestions.map(item => <button key={item} onClick={() => { setTopic(item); research(item) }} disabled={loading}>{item}<span>↗</span></button>)}</div></div>
+        <div className="research-box reveal" id="research-input"><div className="research-box-top"><div><span className="input-kicker">01 / START WITH A QUESTION</span><h2>What’s on your mind?</h2></div><span className="box-spark">✳</span></div><form onSubmit={event => { event.preventDefault(); research() }}><label className="sr-only" htmlFor="topic">Research topic</label><div className="input-row"><Icon name="search" size={21} /><input id="topic" value={topic} onChange={event => setTopic(event.target.value)} placeholder="Enter a topic, question, or idea..." maxLength={300} disabled={loading} autoFocus /><button type="submit" disabled={loading || topic.trim().length < 2}><span>{loading ? 'Researching…' : 'Start research'}</span><Icon name="arrow" size={18} /></button></div></form>{session.status === 'failed' && <div className="alert" role="alert">{session.message}</div>}<div className="suggestion-row"><span>TRY AN IDEA</span>{suggestions.map(item => <button key={item} onClick={() => { setTopic(item); research(item) }} disabled={loading}>{item}<span>↗</span></button>)}</div></div>
         {loading ? <div className="working-card" role="status"><span className="working-spinner" /><div><strong>Research in progress</strong><p>The agent is searching and reading sources. This may take a minute.</p></div></div> : null}
         <ResearchLaunchpad disabled={loading} onChoose={question => { setTopic(question); document.getElementById('topic')?.focus({ preventScroll: true }); document.getElementById('research-input')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' }) }} />
         <div className="feature-section" id="how-it-works"><div className="section-heading reveal"><span>02 / HOW IT WORKS</span><h2>More than a search.<br /><em>A clearer picture.</em></h2></div><div className="feature-grid"><div className="feature-card reveal"><div className="feature-icon"><Icon name="search" /></div><span>01 / DISCOVER</span><h3>Explore broadly</h3><p>Relevant web results give the agent a starting point for your topic.</p></div><div className="feature-card reveal"><div className="feature-icon"><Icon name="book" /></div><span>02 / UNDERSTAND</span><h3>Read the sources</h3><p>The agent extracts useful context from selected pages before writing.</p></div><div className="feature-card reveal"><div className="feature-icon"><Icon name="document" /></div><span>03 / CONNECT</span><h3>Get the full story</h3><p>Receive a structured report with source links and PDF export.</p></div></div></div>

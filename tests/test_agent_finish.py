@@ -17,6 +17,10 @@ def response(content=None, tool_calls=None):
     )
 
 
+def sized_report(start, words=850):
+    return " ".join([start] + ["evidence"] * (words - len(start.split())))
+
+
 def tool(name, arguments, call_id):
     return SimpleNamespace(
         id=call_id,
@@ -33,7 +37,7 @@ class FinishReportTests(unittest.TestCase):
                 tool("read_page", '{"url":"https://one.example"}', "p1"),
                 tool("read_page", '{"url":"https://two.example"}', "p2"),
             ]),
-            response(content="## Summary\nA sourced report."),
+            response(content=sized_report("## Summary\nA sourced report.")),
         ])
 
         def fake_llm(messages, allow_tools=True):
@@ -60,7 +64,7 @@ class FinishReportTests(unittest.TestCase):
         scripted = iter([
             response(tool_calls=[tool("read_page", '{"url":"https://one.example"}', "p1")]),
             RuntimeError("tool_use_failed: Tool choice is none, but model called a tool"),
-            response(content="## Summary\nRecovered report."),
+            response(content=sized_report("## Summary\nRecovered report.")),
         ])
 
         def fake_llm(messages, allow_tools=True):
@@ -76,6 +80,27 @@ class FinishReportTests(unittest.TestCase):
 
         self.assertIn("Recovered report", report)
         self.assertEqual(sources, ["https://one.example"])
+
+    def test_503_word_draft_is_revised_to_the_minimum(self):
+        state = {"pages": [("example", "Source text")], "sources": ["example"]}
+        with patch.object(agent, "call_llm", return_value=response(content=sized_report("Report", 800))) as model:
+            report, _ = agent.finish_report("test", state, sized_report("Draft", 503))
+        self.assertEqual(len(report.split()), 800)
+        self.assertIn("503 words", model.call_args.args[0][-1]["content"])
+        self.assertFalse(model.call_args.kwargs["allow_tools"])
+
+    def test_upper_boundary_is_accepted_without_revision(self):
+        draft = sized_report("Report", 900)
+        with patch.object(agent, "call_llm") as model:
+            self.assertEqual(agent.finish_report("test", {"sources": []}, draft), (draft, []))
+        model.assert_not_called()
+
+    def test_persistent_length_miss_fails_after_bounded_revisions(self):
+        state = {"pages": [("example", "Source text")], "sources": ["example"]}
+        with patch.object(agent, "call_llm", return_value=response(content=sized_report("Report", 901))) as model:
+            with self.assertRaises(agent.ResearchError):
+                agent.finish_report("test", state)
+        self.assertEqual(model.call_count, 1 + agent.MAX_LENGTH_REVISIONS)
 
 
 if __name__ == "__main__":

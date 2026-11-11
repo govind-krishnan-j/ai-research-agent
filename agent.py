@@ -1,3 +1,4 @@
+from inspect import signature
 import json
 import os
 import time
@@ -37,6 +38,10 @@ MAX_PAGE_READS = 2
 MAX_RETRIES = 3
 
 MAX_AGENT_STEPS = 6
+
+MIN_REPORT_WORDS = 800
+MAX_REPORT_WORDS = 900
+MAX_LENGTH_REVISIONS = 2
 
 # ----------------------------------------------------
 # System Prompt
@@ -83,8 +88,9 @@ Write a report containing:
 - Future Outlook
 - Conclusion
 
-Maximum length:
-1000 words.
+Write {MIN_REPORT_WORDS} to {MAX_REPORT_WORDS} words across these sections, aiming for 850.
+Use the space to explain evidence, compare findings, and discuss limitations.
+Avoid repetition and unsupported details. Sources are listed separately by the app.
 """
 
 # ----------------------------------------------------
@@ -203,7 +209,6 @@ def execute_tool(tool_call, state):
     """
 
     tool_name = tool_call.function.name
-    tool_args = json.loads(tool_call.function.arguments)
 
     # ------------------------------------------------
     # Unknown tool
@@ -214,6 +219,22 @@ def execute_tool(tool_call, state):
         return {
             "content": f"Unknown tool: {tool_name}"
         }
+
+    argument = "query" if tool_name == "web_search" else "url"
+    try:
+        tool_args = json.loads(tool_call.function.arguments)
+    except (ValueError, TypeError):
+        tool_args = None
+    if (not isinstance(tool_args, dict)
+            or not isinstance(tool_args.get(argument), str)
+            or not tool_args[argument].strip()):
+        return {"content": f"Invalid arguments for {tool_name}. Supply a nonempty {argument} string."}
+
+    tool = available_tools[tool_name]
+    try:
+        signature(tool).bind(**tool_args)
+    except TypeError:
+        return {"content": f"Invalid arguments for {tool_name}. Check the tool definition."}
 
     # ------------------------------------------------
     # web_search
@@ -229,7 +250,7 @@ def execute_tool(tool_call, state):
 
         state["search_count"] += 1
 
-        result = available_tools[tool_name](**tool_args)
+        result = tool(**tool_args)
 
         return {
             "content": str(result)
@@ -251,7 +272,7 @@ def execute_tool(tool_call, state):
 
         url = tool_args["url"]
 
-        result = available_tools[tool_name](**tool_args)
+        result = tool(**tool_args)
 
         if not result.startswith(("Could not read page:", "Page content could not be extracted")):
             if url not in state["sources"]:
@@ -272,9 +293,22 @@ def execute_tool(tool_call, state):
 # ----------------------------------------------------
 
 
-def finish_report(topic: str, state) -> tuple[str, list[str]]:
+class ResearchError(Exception):
+    """An expected terminal failure with the evidence collected so far."""
+
+    def __init__(self, message: str, sources: list[str]):
+        super().__init__(message)
+        self.sources = sources
+
+
+def finish_report(topic: str, state, draft: str = "") -> tuple[str, list[str]]:
+    # Match the website's whitespace-based count for the report body.
+    word_count = len(draft.split())
+    if MIN_REPORT_WORDS <= word_count <= MAX_REPORT_WORDS:
+        return draft, state["sources"]
+
     if not state["pages"]:
-        return "The agent could not read enough source material. Please try again.", state["sources"]
+        raise ResearchError("The agent could not read enough source material. Please try again.", state["sources"])
 
     source_text = "\n\n".join(
         f"Source {index}: {url}\n{text}"
@@ -292,14 +326,28 @@ def finish_report(topic: str, state) -> tuple[str, list[str]]:
             "content": f"{user_prompt(topic)}\n\nSource material:\n{source_text}",
         },
     ]
-    try:
-        response = call_llm(messages, allow_tools=False)
-        content = response.choices[0].message.content
-        if content and content.strip():
-            return content, state["sources"]
-    except Exception:
-        pass
-    return "The agent completed research but could not generate a report. Please try again.", state["sources"]
+    # A supplied draft already used its first generation attempt.
+    attempts = MAX_LENGTH_REVISIONS if draft else MAX_LENGTH_REVISIONS + 1
+    for _ in range(attempts):
+        if draft:
+            messages = messages[:2] + [
+                {"role": "assistant", "content": draft},
+                {"role": "user", "content": f"This draft has {word_count} words. Rewrite the complete "
+                 f"report in {MIN_REPORT_WORDS} to {MAX_REPORT_WORDS} words using the supplied sources."},
+            ]
+        try:
+            response = call_llm(messages, allow_tools=False)
+            draft = response.choices[0].message.content or ""
+        except Exception as exc:
+            raise ResearchError("The agent could not generate the report. Please try again.", state["sources"]) from exc
+        word_count = len(draft.split())
+        if MIN_REPORT_WORDS <= word_count <= MAX_REPORT_WORDS:
+            return draft, state["sources"]
+
+    raise ResearchError(
+        f"The agent could not produce a {MIN_REPORT_WORDS}–{MAX_REPORT_WORDS} word report. Please try again.",
+        state["sources"],
+    )
 
 
 # ----------------------------------------------------
@@ -307,7 +355,7 @@ def finish_report(topic: str, state) -> tuple[str, list[str]]:
 # ----------------------------------------------------
 
 
-def run_agent(topic: str) -> tuple[str, list[str]]:
+def research_topic(topic: str) -> tuple[str, list[str]]:
     """
     Run the research agent on a given topic.
     Returns (report_text, sources_list).
@@ -338,7 +386,7 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
         except Exception:
             if state["pages"]:
                 return finish_report(topic, state)
-            return "The agent could not complete research. Please try again.", state["sources"]
+            raise ResearchError("The agent could not complete research. Please try again.", state["sources"])
 
         message = response.choices[0].message
 
@@ -362,15 +410,14 @@ def run_agent(topic: str) -> tuple[str, list[str]]:
 
             continue
 
-        # No tool calls — treat as final report
-        content = message.content
-
-        if not content or not content.strip():
-            return finish_report(topic, state)
-
-        if not content or not content.strip():
-            return "The agent completed research but could not generate a report. Please try again.", state["sources"]
-
-        return content, state["sources"]
+        return finish_report(topic, state, draft=message.content or "")
 
     return finish_report(topic, state)
+
+
+def run_agent(topic: str) -> tuple[str, list[str]]:
+    """Keep the original text-and-sources interface for existing callers."""
+    try:
+        return research_topic(topic)
+    except ResearchError as exc:
+        return str(exc), exc.sources
