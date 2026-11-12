@@ -14,46 +14,35 @@ import agent
 import api
 import main
 import tools
-from test_agent_finish import response, sized_report, tool
+
 
 
 class WorkflowTests(unittest.TestCase):
     def test_report_wording_does_not_determine_http_status(self):
-        text = sized_report("The agent could not find agreement between the sources.")
-        with patch.object(agent, "call_llm", return_value=response(content=text)):
+        text = "The agent could not find agreement between the sources."
+        with patch.object(agent, "make_request", return_value=text), patch.object(
+            agent, "web_search", return_value=["source"]
+        ), patch.object(agent, "read_page", return_value="Evidence"):
             result = api.research(api.ResearchRequest(topic="  example  "))
-        self.assertEqual(result, {"topic": "example", "report": text, "sources": []})
+        self.assertEqual(result, {"topic": "example", "report": text, "sources": ["source"]})
 
-    def test_empty_completion_without_evidence_is_a_failure(self):
-        with patch.object(agent, "call_llm", return_value=response(content=" ")):
+    def test_no_evidence_skips_model_and_cli_save(self):
+        with patch.object(agent, "web_search", return_value=[]), patch.object(agent, "make_request") as model:
             with self.assertRaises(HTTPException) as failure:
                 api.research(api.ResearchRequest(topic="example"))
-            legacy_message, sources = agent.run_agent("example")
-        self.assertEqual(failure.exception.status_code, 502)
-        self.assertIn("source material", failure.exception.detail)
-        self.assertEqual(legacy_message, failure.exception.detail)
-        self.assertEqual(sources, [])
+            self.assertEqual(failure.exception.status_code, 502)
+            self.assertEqual(agent.run_agent("example"), (failure.exception.detail, []))
+            with patch("builtins.input", return_value="example"), patch("builtins.print"), patch.object(main, "save_report") as save:
+                main.main()
+                save.assert_not_called()
+            model.assert_not_called()
 
-    def test_cli_does_not_save_failure(self):
-        with patch("builtins.input", return_value="example"), patch("builtins.print"), patch.object(
-            agent, "call_llm", side_effect=RuntimeError("offline")
-        ), patch.object(main, "save_report") as save:
-            main.main()
-        save.assert_not_called()
-
-    def test_agent_can_correct_bad_arguments_within_the_same_run(self):
-        scripted = [
-            response(tool_calls=[tool("read_page", "{", "bad")]),
-            response(tool_calls=[tool("read_page", '{"url":"https://example.org"}', "good")]),
-            response(content=sized_report("Finished")),
-        ]
-        with patch.object(agent, "call_llm", side_effect=scripted) as model, patch.dict(
-            agent.available_tools, {"read_page": lambda url: "example text"}
-        ):
-            report, sources = agent.research_topic("example")
-        self.assertEqual((report, sources), (sized_report("Finished"), ["https://example.org"]))
-        messages = model.call_args.args[0]
-        self.assertTrue(any(m.get("tool_call_id") == "bad" and "Invalid arguments" in m["content"] for m in messages))
+    def test_budget_error_reaches_browser_with_wait_time(self):
+        with patch.object(api, "research_topic", side_effect=agent.BudgetError(23)):
+            with self.assertRaises(HTTPException) as failure:
+                api.research(api.ResearchRequest(topic="example"))
+            self.assertEqual(failure.exception.status_code, 429)
+            self.assertEqual(failure.exception.headers["Retry-After"], "23")
 
     def test_pdf_export_accepts_a_completed_report(self):
         result = api.pdf(api.ReportRequest(topic="example", content="A finding."))
@@ -62,9 +51,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(result.body.startswith(b"%PDF-"))
 
     def test_http_error_page_is_excluded_from_evidence(self):
-        state = {"read_count": 0, "sources": [], "pages": []}
-        with patch.object(tools.requests, "get") as get:
+        with patch.object(tools.requests, "get") as get, patch.object(agent, "web_search", return_value=["source"]):
             get.return_value.raise_for_status.side_effect = HTTPError("page missing")
-            result = agent.execute_tool(tool("read_page", '{"url":"https://example.org"}', "p"), state)
-        self.assertIn("Could not read page", result["content"])
-        self.assertEqual(state, {"read_count": 1, "sources": [], "pages": []})
+            with self.assertRaises(agent.ResearchError):
+                agent.research_topic("example")
