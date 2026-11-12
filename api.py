@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from agent import ResearchError, research_topic
+from agent import BudgetError, ReportLength, ResearchError, research_topic
 from report import generate_pdf_bytes
 
 
@@ -24,6 +24,7 @@ app.add_middleware(
 
 
 class ResearchRequest(BaseModel):
+    length: ReportLength = "detailed"
     topic: str = Field(min_length=2, max_length=300)
 
 
@@ -40,7 +41,9 @@ def research(request: ResearchRequest):
         raise HTTPException(status_code=422, detail="Enter a research topic.")
 
     try:
-        report, sources = research_topic(topic)
+        report, sources = research_topic(topic, request.length)
+    except BudgetError as exc:
+        raise HTTPException(status_code=429, detail=str(exc), headers={"Retry-After": str(exc.retry_after)}) from exc
     except ResearchError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except Exception as exc:
