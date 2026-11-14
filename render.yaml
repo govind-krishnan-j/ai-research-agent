@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: research-atlas
+    runtime: docker
+    plan: free
+    numInstances: 1
+    healthCheckPath: /healthz
+    envVars:
+      - key: REQUIRE_INVITE
+        value: "1"
+      - key: BETA_INVITE_CODE
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false

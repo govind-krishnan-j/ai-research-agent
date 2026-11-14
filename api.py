@@ -1,6 +1,9 @@
 """HTTP API for the research website."""
 
 from pathlib import Path
+import base64
+import hmac
+import os
 import re
 
 from fastapi import FastAPI, HTTPException
@@ -14,6 +17,32 @@ from report import generate_pdf_bytes
 
 
 app = FastAPI(title="Research Atlas API")
+invite_code = os.getenv("BETA_INVITE_CODE")
+if (os.getenv("REQUIRE_INVITE") == "1" or os.getenv("RENDER") == "true") and not invite_code:
+    raise RuntimeError("Set BETA_INVITE_CODE before starting the beta.")
+
+
+@app.middleware("http")
+async def beta_access(request, call_next):
+    if invite_code and request.url.path != "/healthz":
+        scheme, _, value = request.headers.get("authorization", "").partition(" ")
+        try:
+            credentials = base64.b64decode(value, validate=True)
+        except ValueError:
+            credentials = b""
+        if scheme.lower() != "basic" or not hmac.compare_digest(credentials, f"beta:{invite_code}".encode()):
+            return Response(status_code=401, headers={
+                "WWW-Authenticate": 'Basic realm="Research Atlas beta", charset="UTF-8"',
+                "Cache-Control": "no-store",
+            })
+    return await call_next(request)
+
+
+@app.get("/healthz", include_in_schema=False)
+def health():
+    return {"status": "ok"}
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
