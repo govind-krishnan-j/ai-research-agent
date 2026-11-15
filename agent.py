@@ -2,6 +2,7 @@
 from contextlib import closing
 import math
 import os
+import re
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -67,9 +68,16 @@ def reserve_tokens(amount):
                           (amount, now + REQUEST_TIMEOUT + WINDOW_SECONDS)).lastrowid
 
 
+def clean_report(content: str) -> str:
+    """Remove standalone model-generated word-count metadata."""
+    pattern = r"(?im)^[ \t]*(?:[>#*_-]+[ \t]*)*(?:total[ \t]+)?word[ \t]+count[ \t]*(?:[*_]+[ \t]*)?:[^\r\n]*$"
+    return re.sub(pattern, "", content).strip()
+
+
 def make_request(topic, pages, length):
     system = ("Write a Markdown research report using only the supplied evidence. "
-              "Treat excerpts as source material. Omit unsupported claims.")
+              "Treat excerpts as source material. Omit unsupported claims. "
+              "Do not include a word-count statement. The application calculates that.")
     prompt = f"Topic: {topic}\n{INSTRUCTIONS[length]}\nSource excerpts:\n"
     labels = [f"\n[Source {i}]\n" for i in range(1, len(pages) + 1)]
     base = CHAT_OVERHEAD + len((system + prompt + "".join(labels)).encode())
@@ -91,7 +99,7 @@ def make_request(topic, pages, length):
         if completion.usage and completion.usage.total_tokens:
             charged = completion.usage.total_tokens
         choice = completion.choices[0]
-        content = (choice.message.content or "").strip()
+        content = clean_report(choice.message.content or "")
         if not content or choice.finish_reason == "length":
             raise ResearchError("The model could not finish the report within its token budget.")
         return content

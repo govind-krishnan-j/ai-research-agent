@@ -38,6 +38,14 @@ class TokenBudgetTests(unittest.TestCase):
                 payload = sum(len(m["content"].encode()) for m in args["messages"])
                 self.assertLessEqual(payload + agent.CHAT_OVERHEAD + args["max_completion_tokens"], 8000)
 
+    def test_word_count_metadata_is_removed_before_returning_report(self):
+        raw = "# Corvette ZR1\n\n**Word count:** ~910\n\nThe engine produces power."
+        with patch.object(agent.client.chat.completions, "create", return_value=completion(raw)):
+            report = agent.make_request("Corvette", ["Evidence"], "detailed")
+        self.assertNotIn("Word count", report)
+        self.assertIn("The engine produces power.", report)
+        self.assertEqual(agent.clean_report("Word count matters when editing prose."), "Word count matters when editing prose.")
+
     def test_concurrent_reservations_share_capacity(self):
         def try_reserve(_):
             try:
