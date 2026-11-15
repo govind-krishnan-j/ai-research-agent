@@ -7,8 +7,6 @@ services:
     healthCheckPath: /healthz
     envVars:
       - key: REQUIRE_INVITE
-        value: "1"
-      - key: BETA_INVITE_CODE
-        sync: false
+        value: "0"
       - key: GROQ_API_KEY
         sync: false
