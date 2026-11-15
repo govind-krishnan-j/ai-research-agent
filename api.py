@@ -18,13 +18,14 @@ from report import generate_pdf_bytes
 
 app = FastAPI(title="Research Atlas API")
 invite_code = os.getenv("BETA_INVITE_CODE")
-if (os.getenv("REQUIRE_INVITE") == "1" or os.getenv("RENDER") == "true") and not invite_code:
+require_invite = os.getenv("REQUIRE_INVITE", "0") == "1"
+if require_invite and not invite_code:
     raise RuntimeError("Set BETA_INVITE_CODE before starting the beta.")
 
 
 @app.middleware("http")
 async def beta_access(request, call_next):
-    if invite_code and request.url.path != "/healthz":
+    if require_invite and request.url.path != "/healthz":
         scheme, _, value = request.headers.get("authorization", "").partition(" ")
         try:
             credentials = base64.b64decode(value, validate=True)
