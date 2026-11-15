@@ -1,5 +1,7 @@
 # Research Atlas
 
+**Live website:** [Research Atlas](https://research-atlas-qp3h.onrender.com/)
+
 Research Atlas is a dark-themed research website powered by a Python AI agent. Enter a topic, and the agent searches the web, reads selected pages, and writes a structured report with source links. Reports can be downloaded as text or PDF.
 
 The project also includes a command-line interface.
